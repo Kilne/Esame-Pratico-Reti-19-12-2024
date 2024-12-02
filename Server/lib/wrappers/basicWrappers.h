@@ -1,5 +1,5 @@
 /*
-    Collezzione degli header per funzioni wrapper
+    Collezzione degli header per funzioni wrapper per le system call di base
 */
 #ifndef SERVER_LIB_WARPPERS_BASICWRAPPERS_H
 #define SERVER_LIB_WARPPERS_BASICWRAPPERS_H
@@ -8,7 +8,7 @@
 extern int wrappedSocket(int domain, int type);
 
 // Associa un indirizzo ad un socket
-extern void wrappedBind(int sockfd, struct sockaddr_in *addr);
+extern void wrappedBind(int sockfd, struct sockaddr_in addr);
 
 // Imposta le opzioni del socket
 extern void wrappedSocketOpt(int sockfd);

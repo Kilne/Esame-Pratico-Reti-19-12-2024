@@ -10,6 +10,8 @@ add_executable(ServerUDP
     lib/wrappers/addressTools.h
     lib/wrappers/basicWrappers.c
     lib/wrappers/basicWrappers.h
+    lib/argChecker.c
+    lib/argChecker.h
     )
 
 # Multi platform

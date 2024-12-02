@@ -1,6 +1,15 @@
+/*
+    Collezione di wrappers per la creazione e gestione delle system call
+    comuni per la creazione di socket, binding e impostazioni del socket
+    ed altre funzioni di utilità.
+*/
 #include <sys/socket.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <sys/time.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <string.h>
 /*
     Semplice wrapper per creazione socket:
     @domain: famiglia/protocollo derivanti dalle costanti contenute nel file sys/socket.h
@@ -13,7 +22,8 @@ extern int wrappedSocket(int domain, int type)
     int sockfd = socket(domain, type, 0);
     if (sockfd < 0)
     {
-        perror("socket");
+        perror("socket: Errore di creazione del socket\n");
+        strerror(errno);
         exit(EXIT_FAILURE);
     }
     return sockfd;
@@ -24,13 +34,12 @@ extern int wrappedSocket(int domain, int type)
     @addr: struttura contenente l'indirizzo del socket
     @addrlen: dimensione dell'indirizzo
 */
-extern void wrappedBind(int sockfd, struct sockaddr_in *addr)
+extern void wrappedBind(int sockfd, struct sockaddr_in addr)
 {
-    // Casting e sizing dell'indirizzo internamente per praticità
-    struct sockaddr *saddr = (struct sockaddr *)addr;
-    if (bind(sockfd, saddr, sizeof(addr)) < 0)
+    if (bind(sockfd,(struct sockaddr *) &addr, sizeof(addr)) < 0)
     {
-        perror("bind");
+        perror("bind: Errore di binding dell'indirizzo sul socket");
+        strerror(errno);
         exit(EXIT_FAILURE);
     }
 }
@@ -44,22 +53,19 @@ extern void wrappedSocketOpt(int sockfd)
     int enableReuse = 1;
     struct timeval timeout;
     timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
 
     // Setting options for reuse and timeout
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0)
     {
-        perror("setsockopt: SO_REUSEADDR");
+        perror("setsockopt: SO_REUSEADDR\n");
+        strerror(errno);
         exit(EXIT_FAILURE);
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
     {
-        perror("setsockopt: SO_RCVTIMEO");
+        perror("setsockopt: SO_RCVTIMEO\n");
+        strerror(errno);
         exit(EXIT_FAILURE);
     }
-}
-
-/*
- */
-extern wappedRecieve()
-{
 }

@@ -3,10 +3,15 @@
         - Bastato su socket UDP
 */
 #include "lib/wrappers/basicWrappers.h"
+#include "lib/argChecker.h"
 #include <netinet/in.h>
 
 int main(int argc, char const *argv[])
 {
+
+    // Controllo degli argomenti
+    checkArgs(argc);
+
     // Creazione del socket e opzioni per il riuso del socket e timeout
     int serverSocket = wrappedSocket(AF_INET, SOCK_DGRAM);
     wrappedSocketOpt(serverSocket);
@@ -17,11 +22,10 @@ int main(int argc, char const *argv[])
     data dalla specifica protocollo UDP.
     */
     struct sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); 
+    setTheServerAddress(argv, &serverAddr);
 
     // Binding del socket
-    wrappedBind(serverSocket, &serverAddr);
+    wrappedBind(serverSocket, serverAddr);
 
     // ciclo di attesa per i client
     while (1)

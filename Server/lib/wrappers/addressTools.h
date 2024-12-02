@@ -8,7 +8,7 @@
 // Imposta un indirizzo LOCALHOST in network order
 extern void setLocalHostIPV4(struct in_addr *addr);
 // Imposta l'indirizzo in un struttura in_addr con un generico indirizzo IPV4 in network order
-extern void setGenericIP4(char *ip, struct in_addr *addr);
+extern void setGenericIPV4(char *ip, struct in_addr *addr);
 // Ritorna l'indirizzo dotted di un generico indirizzo IP in network order
 extern char * getIPV4HostDecimal(struct in_addr *addr);
 
