@@ -55,4 +55,7 @@ dkms.conf
 ProjectHtmlFiles/
 .vscode/
 Tests/
-Build/
+Builds/CMakeFiles/
+Builds/*
+!Builds/CMakeLists.txt
+

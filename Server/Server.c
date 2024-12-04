@@ -2,9 +2,9 @@
     Server di gioco:
         - Bastato su socket UDP
 */
-#include "lib/wrappers/basicWrappers.h"
-#include "lib/argChecker.h"
-#include "lib/wrappers/pollUtils.h"
+#include "../lib/wrappers/basicWrappers.h"
+#include "../lib/argChecker.h"
+#include "../lib/wrappers/pollUtils.h"
 #include <netinet/in.h>
 #include <stdio.h>
 

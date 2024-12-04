@@ -2,8 +2,8 @@
  *  File header per la gestione delle funzioni di polling.
  */
 
-#ifndef SERVER_LIB_WARPPERS_POLLUTILS_H
-#define SERVER_LIB_WARPPERS_POLLUTILS_H
+#ifndef CLIENT_LIB_WARPPERS_POLLUTILS_H
+#define CLIENT_LIB_WARPPERS_POLLUTILS_H
 
 // Funzione per la creazione del file descriptor per la gestione degli eventi di I/O
 extern void startEpoll();
@@ -14,4 +14,4 @@ extern int waitForEvents();
 // Funzione per la rimozione di un file descriptor dalla lista di quelli da monitorare
 extern void removeFileDescriptorFromThePolling(int fileDescToRemove);
 
-#endif // SERVER_LIB_WARPPERS_POLLUTILS_H
+#endif // CLIENT_LIB_WARPPERS_POLLUTILS_H
