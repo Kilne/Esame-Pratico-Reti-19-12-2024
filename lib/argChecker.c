@@ -93,3 +93,31 @@ extern void setTheServerAddress(char const *argv[], struct sockaddr_in *serverAd
         setGenericIPV4(s, &serverAddr->sin_addr);
     }
 }
+/*
+    Funzione per in controllo di immissione corretto di una porta effimera
+*/
+extern void checkPort(char *port)
+{
+    // Controllo lunghezza porta
+    if (strlen(port) > 5 || strlen(port) < 4)
+    {
+        fprintf(stderr, "Errore: porta non valida, la porta deve essere di 5 cifre(effimera).\n");
+        exit(EXIT_FAILURE);
+    }
+    // Controllo se la porta è un numero
+    for (int i = 0; i < (int)strlen(port); i++)
+    {
+        if (isdigit(port[i]) == 0)
+        {
+            fprintf(stderr, "Errore: porta non valida, la porta deve essere composta da numeri.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    // Controlla l'intervallo numerico
+    int portNum = atoi(port);
+    if (portNum < 49152 || portNum > 65535)
+    {
+        fprintf(stderr, "Errore: porta non valida, la porta deve essere compresa tra 49152 e 65535.\n");
+        exit(EXIT_FAILURE);
+    }
+}

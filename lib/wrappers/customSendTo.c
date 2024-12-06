@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "customErrorPrinting.h"
 
 /*
@@ -17,14 +18,16 @@
     @messageBuffer: buffer per il messaggio da inviare
     @serverAddress: struttura per l'indirizzo del server a cui inviare il messaggio
 */
-extern void customSendTo(int socketToUse, const void *messageBuffer, const struct sockaddr *serverAddress)
+extern void customSendTo(int socketToUse, char *messageBuffer, const struct sockaddr_in *serverAddress)
 {
     // Variabili per la dimensione dell'indirizzo del server e del messaggio
     socklen_t serverAddressSize = sizeof(*serverAddress);
-    size_t messageSize = sizeof(messageBuffer);
+    size_t messageSize = strlen(messageBuffer)+1; // +1 per il terminatore di stringa
+    // Cast dell'indirizzo del server a struct sockaddr
+    struct sockaddr *serverAddr = (struct sockaddr *)serverAddress;
 
     // Invio del messaggio al server
-    if (sendto(socketToUse, messageBuffer, messageSize, 0, serverAddress, serverAddressSize) == -1)
+    if (sendto(socketToUse, messageBuffer, messageSize, 0, serverAddr, serverAddressSize) == -1)
     {
         customErrorPrinting("SendTo: Errore nell'invio del messaggio al server\n");
         exit(EXIT_FAILURE);

@@ -8,6 +8,6 @@
 #include <netinet/in.h>
 // Funzione che riceve un messaggio sul socket passato come argomento, immagazzina il messaggio in un buffer e salva
 // l'indirizzo del mittente nella struttura passata come argomento.
-extern void customSendTo(int socketToUse, const void *messageBuffer, const struct sockaddr *serverAddress);
+extern void customRecvFrom(int socketToUse, char *messageBuffer, const struct sockaddr_in *serverAddress);
 
 #endif // LIB_WRAPPERS_CUSTOMRECVFROM_H

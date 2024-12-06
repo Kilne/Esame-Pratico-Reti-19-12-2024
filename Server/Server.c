@@ -4,9 +4,14 @@
 */
 #include "../lib/wrappers/basicWrappers.h"
 #include "../lib/argChecker.h"
-#include "../lib/wrappers/pollUtils.h"
+#include "../lib/wrappers/customRecvFrom.h"
+#include "../lib/wrappers/customSendTo.h"
+#include "../lib/wrappers/addressTools.h"
+#include "../lib/wrappers/bufHandlers.h"
 #include <netinet/in.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int main(int argc, char const *argv[])
 {
@@ -19,29 +24,40 @@ int main(int argc, char const *argv[])
     wrappedSocketOpt(serverSocket);
 
     /*
-    Inizializzazione della struttura per l'indirizzo del server
-    Nessuna porta è speicificata, quindi il sistema sceglierà una porta libera
-    data dalla specifica protocollo UDP.
+    Inizializzazione della struttura per l'indirizzo del server,
+    porta generata casualmente
     */
     struct sockaddr_in serverAddr;
     setTheServerAddress(argv, &serverAddr);
+    serverAddr.sin_port = getRadnomPort();
+    printf("[INFO] Server impostato all'indirizzo: %s\n", getAddressString(&serverAddr));
 
     // Binding del socket
     wrappedBind(serverSocket, serverAddr);
+    printf("[INFO] Server in ascolto sulla porta: %d\n", ntohs(serverAddr.sin_port));
 
-    // Inizializzazione epoll
-    startEpoll();
+    // Inizializzazione del buffer per la ricezione dei messaggi
+    char *messageBuffer = getStdUDPMessage();
 
-    // Aggiunta del file descriptor del socket alla lista di quelli da monitorare
-    addFileDescriptorToThePolling(serverSocket);
+    // Inizializzazione della struttura per la ricezione dell'indirizzo del client da messaggi
+    struct sockaddr_in clientAddr;
 
     // ciclo di attesa per i client
     while (1)
     {
-        // TODO: Wrapping poll/ppoll per la gestione dei client, del STDERR/STDIO lato server e invio e datagrammi
-        // TODO: AGGIORNARE IL FULE MAKE
-        // Inizio attesa degli eventi
-        int socketEvents = waitForEvents();
+        // Ricezione del messaggio dal client
+        customRecvFrom(serverSocket, messageBuffer, &clientAddr);
+        if (messageBuffer[0] == '\0')
+        {
+            continue;
+        }
+        else
+        {
+            // Stampa del messaggio ricevuto
+            printf("[INFO] Messaggio ricevuto dal client: %s\n", messageBuffer);
+            printf("[INFO] Client connesso all'indirizzo: %s\n", getAddressString(&clientAddr));
+            memset(messageBuffer, 0, strlen(messageBuffer));
+        }
     }
 
     return 0;

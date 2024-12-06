@@ -8,6 +8,8 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
 /*
     Funzione che riceve un messaggio dal server tramite il socket passato come argomento.
@@ -17,20 +19,31 @@
     @serverRecviedFrom: struttura per l'indirizzo del server da cui è stato ricevuto il messaggio
     @return: la lunghezza del messaggio ricevuto
 */
-extern ssize_t customRecvFrom(int socktToRecv, void *messageBuffer, struct sockaddr_in *serverRecviedFrom)
+extern ssize_t customRecvFrom(int socktToRecv, char *messageBuffer, struct sockaddr_in *serverRecviedFrom)
 {
     // Impostazione della dimensione del buffer
-    size_t messageBufferSize = sizeof(messageBuffer);
+    size_t messageBufferSize = 512; // Dimensione standard del buffer per i messaggi UDP
     // Impostazione della dimensione dell'indirizzo del server
     struct sockaddr *serverAddr = (struct sockaddr *)serverRecviedFrom; // Cast a struct sockaddr per la recvfrom
     socklen_t serverAddrSize = sizeof(serverAddr);
 
     // Ricezione del messaggio
     ssize_t recvFromResult = 0;
+
+    // Ricezione del messaggio
     if (recvFromResult = recvfrom(socktToRecv, messageBuffer, messageBufferSize, 0, serverAddr, &serverAddrSize) < 0)
     {
-        customErrorPrinting("recvfrom: Errore nella ricezione del messaggio\n");
-        exit(EXIT_FAILURE);
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+            // Nessun messaggio da ricevere
+            // Continua il ciclo
+            return 0;
+        }
+        else
+        {
+            customErrorPrinting("recvfrom: Errore nella ricezione del messaggio\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
     // Avviso di ricezione del messaggio in caso di successo

@@ -28,6 +28,8 @@ set(LIB_SOURCES
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customSendTo.h
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customErrorPrinting.h
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/addressTools.h
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/bufHandlers.c
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/bufHandlers.h
     ${CMAKE_SOURCE_DIR}/../lib/argChecker.h
 )
 
