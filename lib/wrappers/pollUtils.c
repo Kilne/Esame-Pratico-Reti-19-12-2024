@@ -10,10 +10,7 @@
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include "customErrorPrinting.h"
-#define MAX_EVENTS 100 // Numero massimo di eventi da gestire per file descriptor
 
-// Struttura per la gestione dei file descriptor
-struct epoll_event fileDescriptosEventArray[MAX_EVENTS];
 // Epoll file descriptor
 int epollFd = -1;
 // Contatore interno di file descriptor monitorati
@@ -48,9 +45,10 @@ extern void startEpoll()
     Funzione per l'aggiunta di un file descriptor alla lista di quelli da monitorare
     dall'istanza di epoll.
 
-    @fileDescToWatch: file descriptor da monitorare
+    @param fileDescToWatch: file descriptor da monitorare
+    @param eventFlags: flag per la gestione degli eventi di I/O
 */
-extern void addFileDescriptorToThePolling(int fileDescToWatch)
+extern void addFileDescriptorToThePolling(int fileDescToWatch, uint32_t eventFlags)
 {
     // Controllo se il file descriptor è stato inizializzato, naive ma necessario.
     if (!isEpollInitialized())
@@ -59,15 +57,13 @@ extern void addFileDescriptorToThePolling(int fileDescToWatch)
         exit(EXIT_FAILURE);
     }
 
-    // Inizializazziione della struttura per la gestione degli eventi provenienti dal file descriptor
-    // Eventi da monitorare: EPOLLIN, EPOLLOUT per I/O,  EPOLLRDHUP per i casi in cui il socket venga chiuso
-    // lato client(No errore).
-    struct epoll_event event;
-    event.data.fd = fileDescToWatch;                // File descriptor da monitorare
-    event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP; // Eventi da monitorare
+    // Inizializzazione della struttura per la gestione degli eventi
+    struct epoll_event eventType;
+    eventType.data.fd = fileDescToWatch; // File descriptor da monitorare
+    eventType.events = eventFlags;       // Eventi da monitorare
 
     // Aggiunta del file descriptor alla lista di quelli da monitorare
-    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, fileDescToWatch, &event) == -1)
+    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, fileDescToWatch, &eventType) == -1)
     {
         customErrorPrinting("Errore: epoll_ctl aggiunta FD fallita\n");
         exit(EXIT_FAILURE);
@@ -77,9 +73,11 @@ extern void addFileDescriptorToThePolling(int fileDescToWatch)
 }
 /*
     Funzione per l'attessa degli eventi di I/O, l'attesa è indefinita.
+    @eventsArray: array di eventi di I/O
+    @MaxEvents: numero massimo di eventi di I/O
     @returns: numero di eventi di I/O
 */
-extern int waitForEvents()
+extern int waitForEvents(struct epoll_event *eventsArray, int MAX_EVENTS)
 {
     // Controllo se Epoll è stato inizializzato
     if (!isEpollInitialized())
@@ -95,7 +93,12 @@ extern int waitForEvents()
     }
 
     // Attesa degli eventi di I/O, l'attesa del timeout è indefinita(-1)
-    int returnedEvents = epoll_wait(epollFd, fileDescriptosEventArray, MAX_EVENTS, -1);
+    int returnedEvents = epoll_wait(epollFd, eventsArray, MAX_EVENTS, -1);
+    if (returnedEvents == -1)
+    {
+        customErrorPrinting("[ERROR] Errore nell'attesa degli eventi\n");
+        exit(EXIT_FAILURE);
+    }
 
     return returnedEvents;
 }
@@ -107,7 +110,7 @@ extern int waitForEvents()
 */
 extern void removeFileDescriptorFromThePolling(int fileDescToRemove)
 {
-    // Controllo se il file descriptor è stato inizializzato, naive ma necessario.
+    // Controllo se l'istanza di epoll è stata inizializzata.
     if (!isEpollInitialized())
     {
         customErrorPrinting("Errore: epoll non inizializzato\n");
@@ -123,4 +126,22 @@ extern void removeFileDescriptorFromThePolling(int fileDescToRemove)
 
     // Decremento del contatore interno di file descriptor monitorati
     fileDescriptorCounter--;
+}
+/*
+    Funzione per la modifica delle flag di un file descriptor.
+    @param fdToMod: file descriptor da modificare
+    @param newFlag: nuova flag da assegnare al file descriptor
+
+*/
+extern void modifyFileDescFlags(int fdToMod, uint32_t newFlag)
+{
+    // Modifica delle flag del file descriptor
+    struct epoll_event eventType;
+    eventType.data.fd = fdToMod;
+    eventType.events = newFlag;
+    if (epoll_ctl(epollFd, EPOLL_CTL_MOD, fdToMod, &eventType) == -1)
+    {
+        customErrorPrinting("[ERROR] epoll_ctl(): modifica flag FD fallita\n");
+        exit(EXIT_FAILURE);
+    }
 }

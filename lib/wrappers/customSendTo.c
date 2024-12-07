@@ -22,7 +22,7 @@ extern void customSendTo(int socketToUse, char *messageBuffer, const struct sock
 {
     // Variabili per la dimensione dell'indirizzo del server e del messaggio
     socklen_t serverAddressSize = sizeof(*serverAddress);
-    size_t messageSize = strlen(messageBuffer)+1; // +1 per il terminatore di stringa
+    size_t messageSize = strlen(messageBuffer) + 1; // +1 per il terminatore di stringa
     // Cast dell'indirizzo del server a struct sockaddr
     struct sockaddr *serverAddr = (struct sockaddr *)serverAddress;
 
@@ -34,5 +34,5 @@ extern void customSendTo(int socketToUse, char *messageBuffer, const struct sock
     }
 
     // Avviso di invio del messaggio al server in caso di successo
-    printf("[INFO] Messaggio inviato al server\n");
+    printf("[INFO] Messaggio inviato con sendTo()\n");
 }

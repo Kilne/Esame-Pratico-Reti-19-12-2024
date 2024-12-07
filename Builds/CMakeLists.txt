@@ -30,6 +30,12 @@ set(LIB_SOURCES
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/addressTools.h
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/bufHandlers.c
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/bufHandlers.h
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customConnection.c
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customConnection.h
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customUDPTransmission.c
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customUDPTransmission.h
+    ${CMAKE_SOURCE_DIR}/../lib/gamelogics/meteorites.c
+    ${CMAKE_SOURCE_DIR}/../lib/gamelogics/meteorites.h
     ${CMAKE_SOURCE_DIR}/../lib/argChecker.h
 )
 

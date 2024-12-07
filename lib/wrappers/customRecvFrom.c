@@ -47,7 +47,7 @@ extern ssize_t customRecvFrom(int socktToRecv, char *messageBuffer, struct socka
     }
 
     // Avviso di ricezione del messaggio in caso di successo
-    printf("[INFO] Messaggio ricevuto dal server\n");
+    printf("[INFO] Messaggio ricevuto con recvFrom()\n");
 
     // Ritorno del risultato della recvfrom, la lunghezza del messaggio ricevuto
     // non è necessaria in quanto la recvfrom restituisce l'indiritto del mittente

@@ -8,10 +8,12 @@
 #include "../lib/wrappers/customSendTo.h"
 #include "../lib/wrappers/addressTools.h"
 #include "../lib/wrappers/bufHandlers.h"
+#include "../lib/gamelogics/meteorites.h"
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 int main(int argc, char const *argv[])
 {
@@ -38,25 +40,36 @@ int main(int argc, char const *argv[])
 
     // Inizializzazione del buffer per la ricezione dei messaggi
     char *messageBuffer = getStdUDPMessage();
+    int isGameStarted = 0;
 
     // Inizializzazione della struttura per la ricezione dell'indirizzo del client da messaggi
     struct sockaddr_in clientAddr;
 
+    // Inzializzazione del buffer che contiene le future posizioni per i meteoriti
+    // Generate casualmente
+    char *meteoritesBuffer = calloc(20, sizeof(char));
+
     // ciclo di attesa per i client
     while (1)
     {
+        // Ogni 2 si generano nuove posizioni per i meteoriti
+        int s = sleep(2);
+        generateMeteorites(meteoritesBuffer, 20);
         // Ricezione del messaggio dal client
         customRecvFrom(serverSocket, messageBuffer, &clientAddr);
-        if (messageBuffer[0] == '\0')
+        if (strcmp(messageBuffer, "START") == 0 && isGameStarted == 0)
         {
-            continue;
+            // Invio delle posizioni dei meteoriti al client
+            isGameStarted = 1;
+            printf("[INFO] Inizio del gioco\n");
+            freeUDPMessage(messageBuffer);
+            messageBuffer = getStdUDPMessage();
         }
-        else
+        if (isGameStarted == 1)
         {
-            // Stampa del messaggio ricevuto
-            printf("[INFO] Messaggio ricevuto dal client: %s\n", messageBuffer);
-            printf("[INFO] Client connesso all'indirizzo: %s\n", getAddressString(&clientAddr));
-            memset(messageBuffer, 0, strlen(messageBuffer));
+            // Invio delle posizioni dei meteoriti al client
+            customSendTo(serverSocket, meteoritesBuffer, &clientAddr);
+            memset(messageBuffer, 0, 20);
         }
     }
 
