@@ -28,10 +28,10 @@ extern ssize_t customRecvFrom(int socktToRecv, char *messageBuffer, struct socka
     socklen_t serverAddrSize = sizeof(serverAddr);
 
     // Ricezione del messaggio
-    ssize_t recvFromResult = 0;
+    ssize_t recvFromResult = recvfrom(socktToRecv, messageBuffer, messageBufferSize, 0, serverAddr, &serverAddrSize);
 
-    // Ricezione del messaggio
-    if (recvFromResult = recvfrom(socktToRecv, messageBuffer, messageBufferSize, 0, serverAddr, &serverAddrSize) < 0)
+        // Ricezione del messaggio
+        if (recvFromResult < 0)
     {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {

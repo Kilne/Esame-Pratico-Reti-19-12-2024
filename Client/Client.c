@@ -21,7 +21,7 @@ int main(int argc, char const *argv[])
     // Controllo degli argomenti
     checkArgs(argc);
 
-    // Creazione del socket e opzioni per il riuso del socket e timeout
+    // Creazione del socket e opzioni per il riuso del socket
     int clientSocket = wrappedSocket(AF_INET, SOCK_DGRAM);
     wrappedSocketOpt(clientSocket);
 
@@ -47,6 +47,8 @@ int main(int argc, char const *argv[])
 
     // Inzia il gioco
     customSend(clientSocket, "START");
+
+    // TODO : FARE TUTTA LA PRASSI DI GIOCO: FIFO, TERMINALE, ECC...
 
     // Ciclo di gioco
     while (1)

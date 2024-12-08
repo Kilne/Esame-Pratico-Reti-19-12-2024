@@ -1,8 +1,11 @@
 /*
+    File contenente le funzioni per la gestione della griglia di gioco
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define ROWS 21 // 20 righe di gioco + 1 riga di avviso
 #define COLUMNS 20
@@ -10,8 +13,11 @@
 #define EMPTY_CELL ' '
 #define METEORITE_CELL 'o'
 #define SHIP_CELL '^'
+#define EXPLOSION_CELL 'X'
 #define DANGER_MESSAGE "ATTENZIONE: METEORITE IN ARRIVO!"
 #define DANGER_RANGE 5
+#define LEFT_ARROW "\x1b[D"
+#define RIGHT_ARROW "\x1b[C"
 
 // Griglia di gioco
 char **grid;
@@ -20,6 +26,8 @@ char **grid;
     Solo in una riga, aggiornato a ogni iterazione
 */
 int shipPosition = 9; // Posizione iniziale e centrale
+// Perciolo collisione attivo
+int dangerActive = 0;
 
 /*
     Inizializzazione della griglia di gioco
@@ -33,23 +41,114 @@ extern void init()
     {
         grid[i] = calloc(COLUMNS, sizeof(char));
     }
-}
 
-/*
-    Stampa la griglia di gioco
-*/
-extern void printGrid()
-{
+    // Inizializzazione della griglia di gioco
     for (int i = 0; i < ROWS; i++)
     {
         for (int j = 0; j < COLUMNS; j++)
         {
-            printf("%c", grid[i][j]);
+            if (i == ROWS - 1 && j == shipPosition)
+            {
+                grid[i][j] = SHIP_CELL;
+            }
+            else
+            {
+                grid[i][j] = EMPTY_CELL;
+            }
         }
-        printf("\n");
     }
 }
+/*
+    Funzione per muovere la nave di gioco
+*/
 
+extern void shipMovement(int move)
+{
+    // La nave si muove solo in orizzontale di 1 posizione
+    // tante vole quanto si preme una freccia direzionale
+    // Se la nave è alla fine della griglia, non si muove
+    // La posizione è tenuta in memoria per la prossima iterazione
+    // di redrawRowsTicker().
+    if (move == 1)
+    {
+        // Controllo per il movimento a destra
+        if ((shipPosition + move) < (COLUMNS - 1))
+        {
+            grid[ROWS - 1][shipPosition] = EMPTY_CELL;
+            grid[ROWS - 1][shipPosition + 1] = SHIP_CELL;
+            shipPosition++; // Aggiornamento della posizione
+        }
+    }
+    else if (move == -1)
+    {
+        // Controllo per il movimento a sinistra
+        if ((shipPosition - move) > 0)
+        {
+            grid[ROWS - 1][shipPosition] = EMPTY_CELL;
+            grid[ROWS - 1][shipPosition - 1] = SHIP_CELL;
+            shipPosition--;
+        }
+    }
+}
+/*
+    Check per avviso di pericolo
+*/
+void checkDanger()
+{
+    // Il controllo del pericolo è fatto ad oogni redrawRowsTicker()
+    // In corrispondenza della posizione della nave, se almeno 5 righe sopra
+    // c'è un meteorite, viene mostrato un avviso di pericolo
+    // nella riga di avviso apposita.
+    for (int i = ROWS - 2; i < (ROWS - 2 - DANGER_RANGE); i--)
+    {
+        if (grid[i][shipPosition] == METEORITE_CELL)
+        {
+            dangerActive = 1;
+            grid[ROWS - 1] = DANGER_MESSAGE;
+            break;
+        }
+    }
+    if (dangerActive == 1) // Se il pericolo è passato, si resetta la riga di avviso
+    {
+        for (int i = 0; i < COLUMNS; i++)
+        {
+            grid[ROWS - 1][i] = EMPTY_CELL;
+        }
+        dangerActive = 0;
+    }
+}
+/*
+    Pulizia STDIN con reset del terminale
+*/
+void cleanStdin()
+{
+// Pulizia dello stdin a seconda del sistema operativo, windows
+// è escuso per requisiti di progetto.
+#if defined(__APPLE__) && defined(__MACH__)
+    system("clear");
+#elif defined(__linux__)
+    system("tput reset");
+#endif
+}
+/*
+    Manipolazione terminale per la lettura di un singolo carattere
+    @param mode: modalità di operazione del terminale[0,1]
+    - 0: modalità normale (cooked)
+    - 1: modalità game mode(raw)
+*/
+extern void setTerminalMode(int mode)
+{
+    // Modalità normale
+    if (mode == 0)
+    {
+        system("stty cooked echo"); // Terminal is cooking...
+    }
+    // Modalità game mode
+    else if (mode == 1)
+    {
+        system("stty raw -echo"); // ITS RAWWWWW!!(cit. Chef Ramsay)
+    }
+}
 /*
     Rimozione della grid di gioco e deallocazione della memoria
 */
@@ -61,6 +160,65 @@ extern void freeGrid()
     }
     free(grid);
     shipPosition = 9;
+}
+/*
+    Funzione per monitorare l'input da tastiera
+    e reagire ai comandi di movimento della nave,
+    in aggiunta alla terminazione del gioco da parte
+    dell'utente.
+    @param input: input da tastiera
+    @param inputSize: dimensione dell'input
+*/
+extern void checkTheInput(char *input, int inputSize)
+{
+    // Gli input essendo tutti in raw mode non hanno null terminator
+    // Per fare quindi dei controlli con stringhe predefinite, si
+    // deve aggiungere il null terminator manualmente.
+    input[inputSize] = '\0';
+
+    // Controllo per la terminazione del gioco
+    if (strcmp(input, "q") == 0)
+    {
+        freeGrid();
+        exit(EXIT_SUCCESS);
+    }
+
+    // Controllo per il movimento della nave
+    if (strcmp(input, LEFT_ARROW) == 0)
+    {
+        shipMovement(-1);
+    }
+    else if (strcmp(input, RIGHT_ARROW) == 0)
+    {
+        shipMovement(1);
+    }
+    else if (strcmp(input, "q") == 0)
+    {
+        setTerminalMode(0);
+        cleanStdin();
+        freeGrid();
+        printf("Uscita dal gioco a breve.\n");
+        sleep(2);
+        exit(EXIT_SUCCESS);
+    }
+}
+/*
+    Stampa la griglia di gioco
+*/
+extern void printGrid()
+{
+    // Pulizia dello stdin
+    cleanStdin();
+
+    // Stampa della griglia di gioco
+    for (int i = 0; i < ROWS; i++)
+    {
+        for (int j = 0; j < COLUMNS; j++)
+        {
+            printf("%c", grid[i][j]);
+        }
+        printf("\n");
+    }
 }
 
 /*
@@ -83,7 +241,47 @@ extern void addMeteors(char *newRowBuffer)
         }
     }
 }
-
+/*
+    Funzione interna per la schermata di game over
+*/
+void gameOver()
+{
+    // Ascii art per il game over
+    char *gameOverText[] = {
+        "  ________   __  _______",
+        " / ___/ _ | /  |/  / __/",
+        "/ (_ / __ |/ /|_/ / _/  ",
+        "\\___/_/_|_/_/__/_/___/  ",
+        " / __ \\ | / / __/ _ \\   ",
+        "/ /_/ / |/ / _// , _/   ",
+        "\\____/|___/___/_/|_|    ",
+        "                        "};
+    printf("\n");
+    for (int i = 0; i < 8; i++)
+    {
+        cleanStdin();
+        printf("%s\n", gameOverText[i]);
+    }
+}
+/*
+    Funzione interna per controllare la collisione tra la nave e un meteorite
+    @param actualRow: riga attuale
+    @param rowBefore: riga precedente
+*/
+void checkCollision(char *actualRow, char *rowBefore)
+{
+    int col = 0;
+    while (col < COLUMNS)
+    {
+        if (actualRow[col] == SHIP_CELL && rowBefore[col] == METEORITE_CELL)
+        {
+            // Game over
+            gameOver();
+            freeGrid();
+            exit(EXIT_SUCCESS); // Uscita dal gioco
+        }
+    }
+}
 /*
     Scorre la griglia di gioco verso il basso
 */
@@ -92,21 +290,25 @@ extern void redrawRowsTicker()
     // Partendo dalla penultima riga, scorro verso il basso
     // Riga di avviso esclusa
     int startingRefreshRow = ROWS - 2;
-    while (startingRefreshRow > 0)
-    {
-        /*
-            Partendo dall'ultima riga, copio la riga precedente
-            Facendo un controllo se la posizione della nave e un meteorite
-            coincido, in quel caso la partita è persa.
 
-            Se la posizione della nave è uguale verticalemente a quella di un meteorite
-            almeno 5 righe sopra la nave, viene mostrato un avviso di pericolo.
-        */
-        for (int i = 0; i < COLUMNS; i++)
+    /*
+        Partendo dall'ultima riga, copio la riga precedente
+        Facendo un controllo se la posizione della nave e un meteorite
+        coincido, in quel caso la partita è persa.
+
+        Se la posizione della nave è uguale verticalemente a quella di un meteorite
+        almeno 5 righe sopra la nave, viene mostrato un avviso di pericolo.
+    */
+    for (int i = 0; i < COLUMNS; i++)
+    {
+        // Ciclo all'indietro colonna per colonna
+        // ed ogni riga viene copiata nella riga successiva
+        for (int j = startingRefreshRow; j == 0; j--)
         {
-            // TODO: FARE REDRAW
-            // TODO: FARE CONTROLLO COLLISIONE
-            // TODO: FARE GAME OVER LOGIC
+            checkCollision(grid[j], grid[j - 1]);
+            grid[j][i] = grid[j - 1][i];
         }
     }
+    // Controllo per l'avviso di pericolo
+    checkDanger();
 }

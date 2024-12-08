@@ -12,6 +12,7 @@ include_directories(${CMAKE_SOURCE_DIR}/../lib)
 # Source files
 set(SERVER_SOURCES ${CMAKE_SOURCE_DIR}/../Server/Server.c)
 set(CLIENT_SOURCES ${CMAKE_SOURCE_DIR}/../Client/Client.c)
+set(GAME_SOURCES    ${CMAKE_SOURCE_DIR}/../gameEngine.c)
 
 # Library files
 set(LIB_SOURCES
@@ -34,11 +35,16 @@ set(LIB_SOURCES
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customConnection.h
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customUDPTransmission.c
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customUDPTransmission.h
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customFifoTools.h
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customFifoTools.c
     ${CMAKE_SOURCE_DIR}/../lib/gamelogics/meteorites.c
     ${CMAKE_SOURCE_DIR}/../lib/gamelogics/meteorites.h
+    ${CMAKE_SOURCE_DIR}/../lib/gamelogics/drawingField.h
+    ${CMAKE_SOURCE_DIR}/../lib/gamelogics/drawingField.c
     ${CMAKE_SOURCE_DIR}/../lib/argChecker.h
 )
 
 # Add executable targets
 add_executable(Server ${SERVER_SOURCES} ${LIB_SOURCES})
 add_executable(Client ${CLIENT_SOURCES} ${LIB_SOURCES})
+add_executable(Game ${GAME_SOURCES} ${LIB_SOURCES})

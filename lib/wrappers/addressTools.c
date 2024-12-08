@@ -4,6 +4,7 @@
     in network order e viceversa, in particolare la funzione inet_aton
     e inet_ntop
 */
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -21,7 +22,7 @@
 */
 extern void setLocalHostIPV4(struct in_addr *addr)
 {
-    if (inet_aton(LOCALHOST, addr) == 0)
+    if (inet_pton(AF_INET, LOCALHOST, addr) != 1)
     {
         customErrorPrinting("Errore LOCALHOST: conversione indirizzo IP non riuscita:\n");
         exit(EXIT_FAILURE);
@@ -34,7 +35,7 @@ extern void setLocalHostIPV4(struct in_addr *addr)
 */
 extern void setGenericIPV4(char *ip, struct in_addr *addr)
 {
-    if (inet_aton(ip, addr) == 0)
+    if (inet_pton(AF_INET, ip, addr) != 1)
     {
         customErrorPrinting("Errore IPV4: conversione indirizzo IP non riuscita\n");
         exit(EXIT_FAILURE);
@@ -79,7 +80,7 @@ extern char *getAddressString(struct sockaddr_in *addr)
     static char address[INET_ADDRSTRLEN + 6];
     // Conversione dell'indirizzo IP e della porta in stringa
     char *ip = getIPV4HostDecimal(&addr->sin_addr);
-    sprintf(address, "%s:%d", ip, ntohs(addr->sin_port));
+    snprintf(address,sizeof(address), "%s:%d", ip, ntohs(addr->sin_port));
 
     return address;
 }

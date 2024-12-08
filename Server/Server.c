@@ -53,7 +53,7 @@ int main(int argc, char const *argv[])
     while (1)
     {
         // Ogni 2 si generano nuove posizioni per i meteoriti
-        int s = sleep(2);
+        sleep(2);
         generateMeteorites(meteoritesBuffer, 20);
         // Ricezione del messaggio dal client
         customRecvFrom(serverSocket, messageBuffer, &clientAddr);
