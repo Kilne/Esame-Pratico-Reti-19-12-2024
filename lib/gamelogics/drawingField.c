@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
+#include "../wrappers/customErrorPrinting.h"
 
 #define ROWS 21 // 20 righe di gioco + 1 riga di avviso
 #define COLUMNS 20
@@ -122,13 +124,19 @@ void checkDanger()
 */
 void cleanStdin()
 {
-// Pulizia dello stdin a seconda del sistema operativo, windows
-// è escuso per requisiti di progetto.
-#if defined(__APPLE__) && defined(__MACH__)
-    system("clear");
-#elif defined(__linux__)
-    system("tput reset");
-#endif
+    // Pulizia visuale del terminale mediante escape character
+    // il primo set di è per il posizionamento del cursore, alto sx
+    // il secondo per la pulizia.
+    printf("\033[H\033[J");
+
+    // Pulizia del buffer stdin per letture successive di read
+    // fatto con tcflush dalla librearia termios.h con flag TCIFLUSH
+    // per la pulizia del buffer di input non letto.
+    if (tcflush(STDIN_FILENO, TCIFLUSH) != 0)
+    {
+        customErrorPrinting("[ERROR] tcflush() fallita\n");
+        exit(EXIT_FAILURE);
+    }
 }
 /*
     Manipolazione terminale per la lettura di un singolo carattere
@@ -138,16 +146,27 @@ void cleanStdin()
 */
 extern void setTerminalMode(int mode)
 {
-    // Modalità normale
+    // Struttura per le impostazioni del terminale
+    struct termios termios_p;
+
+    // Impostazioni del terminale corrente
+    tcgetattr(STDIN_FILENO, &termios_p);
+
     if (mode == 0)
     {
-        system("stty cooked echo"); // Terminal is cooking...
+        // Modalità normale (cooked)
+        termios_p.c_lflag |= (ICANON | ECHO); // Flag per modalità canonica e echo
     }
-    // Modalità game mode
     else if (mode == 1)
     {
-        system("stty raw -echo"); // ITS RAWWWWW!!(cit. Chef Ramsay)
+        // Modalità game mode (raw)
+        termios_p.c_lflag &= ~(ICANON | ECHO); // Disabilitazione di modalità canonica e echo
+        termios_p.c_cc[VMIN] = 1;              // Numero di caratteri minimi per attivare la lettura
+        termios_p.c_cc[VTIME] = 0;             // Timeout per la modalità non canonica
     }
+
+    // Applicazione delle impostazioni
+    tcsetattr(STDIN_FILENO, TCSANOW, &termios_p);
 }
 /*
     Rimozione della grid di gioco e deallocazione della memoria
@@ -177,11 +196,6 @@ extern void checkTheInput(char *input, int inputSize)
     input[inputSize] = '\0';
 
     // Controllo per la terminazione del gioco
-    if (strcmp(input, "q") == 0)
-    {
-        freeGrid();
-        exit(EXIT_SUCCESS);
-    }
 
     // Controllo per il movimento della nave
     if (strcmp(input, LEFT_ARROW) == 0)

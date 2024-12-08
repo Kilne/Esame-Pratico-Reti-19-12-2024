@@ -11,5 +11,7 @@ extern void createFifo();
 extern int getFifoFd();
 // Impostazione del file descriptor della FIFO
 extern void setFifoFd();
+// Chiusura della FIFO, cancellazione e reset del file descriptor
+extern void deleteFifo();
 
 #endif // LIB__WRAPPERS__CUSTOMFIFOTOOLS_H

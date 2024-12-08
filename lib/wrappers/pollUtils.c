@@ -92,7 +92,7 @@ extern int waitForEvents(struct epoll_event *eventsArray, int MAX_EVENTS)
         exit(EXIT_FAILURE);
     }
 
-    // Attesa degli eventi di I/O, l'attesa del timeout è indefinita(-1)
+    // Attesa degli eventi di I/O
     int returnedEvents = epoll_wait(epollFd, eventsArray, MAX_EVENTS, -1);
     if (returnedEvents == -1)
     {

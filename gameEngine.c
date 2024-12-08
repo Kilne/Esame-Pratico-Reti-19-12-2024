@@ -12,6 +12,9 @@
 
 int main()
 {
+    // Chiusura della FIFO se esiste
+    atexit(deleteFifo);
+
     // Inizializzazione della griglia di gioco
     init();
 
@@ -35,40 +38,34 @@ int main()
     // Ciclo di gioco
     while (1)
     {
-        // Tick rate per ogni refresh della griglia e dei segnali per la Epoll
-        sleep(1);
         // Ad ogni ciclo ridisegno la griglia di gioco
         printGrid();
 
         // Eventi FIFO
         struct epoll_event events[2]; // FIFO e tastiera
-        /*
-            - L'Epoll sta bloccando il processo fino a che non si verifica un evento, non va bene per il gioco per i client / server
-            potrebbe andare bene, analizzare il caso d'uso e decidere.
-            - L'immissione di un carattere non viene presa dallo STDIN_FILENO, senza che si prema invio rischiando di aggiungere
-            un carattere di troppo
-            - Mettendo un carattere terminatore in CheckTheInput al confronto successivo con strcmp non viene MAI trovata
-            la corrispondenza con le macro e carattere di uscita, quindi non si esce mai dal gioco ne muove la nave.
 
-        */
+        // Attesa degli eventi di I/O
         int triggeredEvents = waitForEvents(events, 2);
 
         // Gestione degli eventi
         if (triggeredEvents > 0)
         {
             // Controllo evento
-            if (events[0].data.fd == fifoFd)
+            for (int i = 0; i < triggeredEvents; i++)
             {
-                // Lettura dalla FIFO
-                read(fifoFd, fifoBuffer, 20);
-                addMeteors(fifoBuffer);
-            }
-            else if (events[0].data.fd == STDIN_FILENO)
-            {
-                // Lettura da tastiera
-                char c[10];
-                int n = read(STDIN_FILENO, c, 9);
-                checkTheInput(c, n);
+                if (events[i].data.fd == fifoFd)
+                {
+                    // Lettura dalla FIFO
+                    read(fifoFd, fifoBuffer, 20);
+                    addMeteors(fifoBuffer);
+                }
+                else if (events[i].data.fd == STDIN_FILENO)
+                {
+                    // Lettura da tastiera
+                    char c[10];
+                    int n = read(STDIN_FILENO, c, 9);
+                    checkTheInput(c, n);
+                }
             }
         }
     }

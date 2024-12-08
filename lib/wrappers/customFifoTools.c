@@ -19,21 +19,8 @@ int fifoFd = -1;
     Creazione della FIFO
 */
 extern void createFifo()
-{   
-    // Controllo se la FIFO esiste già
-    if (access(FIFO_PATH, F_OK) != -1)
-    {
-        // Rimozione della FIFO
-        if (unlink(FIFO_PATH) == -1)
-        {
-            customErrorPrinting("[ERROR] unlink(): Errore nella rimozione della FIFO\n");
-            exit(EXIT_FAILURE);
-        }
-        else
-        {
-            printf("[INFO] FIFO rimossa con successo\n");
-        }
-    }
+{
+
     // Creazione della FIFO
     if (mkfifo(FIFO_PATH, 0666) == -1)
     {
@@ -71,5 +58,37 @@ extern void setFifoFd()
     {
         customErrorPrinting("[ERROR] open(): Errore nell'apertura della FIFO\n");
         exit(EXIT_FAILURE);
+    }
+}
+/*
+    Cancella la FIFO previa controlli e chiusura del file descriptor
+*/
+extern void deleteFifo()
+{
+    // Controllo se la FIFO esiste già
+    if (access(FIFO_PATH, F_OK) == -1)
+    {
+        customErrorPrinting("[ERROR] access(): La FIFO non esiste\n");
+    }
+    else
+    {
+        // Chiusura del file descriptor
+        if (close(fifoFd) == -1)
+        {
+            customErrorPrinting("[ERROR] close(): Errore nella chiusura del file descriptor\n");
+            exit(EXIT_FAILURE);
+        }
+        // Rimozione della FIFO
+        if (unlink(FIFO_PATH) == -1)
+        {
+            customErrorPrinting("[ERROR] unlink(): Errore nella rimozione della FIFO\n");
+            exit(EXIT_FAILURE);
+        }
+        else
+        {
+            // Reset del file descriptor
+            fifoFd = -1;
+            printf("[INFO] FIFO rimossa con successo\n");
+        }
     }
 }

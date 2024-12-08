@@ -49,6 +49,13 @@ int main(int argc, char const *argv[])
     // Generate casualmente
     char *meteoritesBuffer = calloc(20, sizeof(char));
 
+    /*
+        TODO:
+            - IL sistema di game start è stupido dovresti mettere in lista i vari client e quando sono pronti iniziare il gioco
+            mandargli a tutti il nuovo set di meteoriti e poi aspettare che finiscano di giocare
+            - Quando un client si disconnette rimuoverlo dalla lista, il client dovrebbe mandare un messaggio di disconnessione
+    */
+
     // ciclo di attesa per i client
     while (1)
     {
