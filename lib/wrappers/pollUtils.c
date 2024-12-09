@@ -145,3 +145,22 @@ extern void modifyFileDescFlags(int fdToMod, uint32_t newFlag)
         exit(EXIT_FAILURE);
     }
 }
+/*
+    Funzione per la chiusura dell'istanza di epoll
+*/
+extern void closeEpoll()
+{
+    // Controllo se l'istanza di epoll è stata inizializzata
+    if (!isEpollInitialized())
+    {
+        customErrorPrinting("Errore: epoll non inizializzato\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Chiusura dell'istanza di epoll
+    if (close(epollFd) == -1)
+    {
+        customErrorPrinting("Errore: chiusura epoll fallita\n");
+        exit(EXIT_FAILURE);
+    }
+}

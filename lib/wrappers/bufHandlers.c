@@ -33,32 +33,40 @@ extern void freeUDPMessage(char *message)
 {
     // Libero la memoria allocata per il messaggio UDP ed assegno NULL al puntatore.
     free(message);
-    message = NULL;
-    // Controllo se la deallocazione è andata a buon fine
-    if (message != NULL)
-    {
-        fprintf(stderr, "[ERROR] free(): Errore nella deallocazione della memoria per il messaggio UDP\n");
-        exit(EXIT_FAILURE);
-    }
 }
 /*
     Funzione per accomodare un messaggio UDP in un buffer di dimensione standard
-    @param char ** bugger: buffer in cui inserire il messaggio
-    @param char * message: messaggio da inserire nel buffer
-    @param size_t m_len: lunghezza del messaggio
+    @param  **buffer: buffer in cui inserire il messaggio
+    @param  *message: messaggio da inserire nel buffer
+    @param  m_len: lunghezza del messaggio
 */
 extern void setUDPMessage(char **buffer, char *message, size_t m_len)
 {
     // Controllo eccessiva lunghezza del nuovo buffer
     if (m_len > 512)
     {
-        fprintf(stderr,"[ERRORE] Il messaggio eccede la grandezza impostata per il pacchetto UDP(512)\n");
+        fprintf(stderr, "[ERRORE] Il messaggio eccede la grandezza impostata per il pacchetto UDP(512)\n");
         exit(EXIT_FAILURE);
     }
-    // Nuova locazione di memoria memorizzata temporaneamente
-    char *tempPtr = realloc(*buffer, m_len);
-    // Copia contenuti con memmove per evitare socrascritture contigue
-    memmove(tempPtr, message, m_len);
-    //Assegnazione puntatore della nuova locazione al buffer originale
-    *buffer = tempPtr;
+    // Allocazione di un nuovo buffer temporaneo
+    // con la dimensione del messaggio, questo per coprire
+    // il caso in cui buffer e message sia lo stesso puntatore
+    // e realloc e free possano far perdere dati.
+    char *newBuffer = calloc(m_len, sizeof(char));
+
+    // Controllo se l'allocazione è andata a buon fine
+    if (newBuffer == NULL)
+    {
+        fprintf(stderr, "[ERRORE] Errore nell'allocazione della memoria per il nuovo buffer\n");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        // Copia del messaggio nel nuovo buffer
+        memcpy(newBuffer, message, m_len);
+        // Deallocazione del vecchio buffer
+        freeUDPMessage(*buffer);
+        // Assegnazione del nuovo puntatore riallocato al buffer originale
+        *buffer = newBuffer;
+    }
 }

@@ -17,5 +17,7 @@ extern int waitForEvents(struct epoll_event *eventsArray, int MAX_EVENTS);
 extern void removeFileDescriptorFromThePolling(int fileDescToRemove);
 // Funzione per la modifica dei flag di un file descriptor
 extern void modifyFileDescFlags(int fdToMod, uint32_t newFlag);
+// Chiusura del file descriptor per la gestione degli eventi di I/O
+extern void closeEpoll();
 
 #endif // CLIENT_LIB_WARPPERS_POLLUTILS_H

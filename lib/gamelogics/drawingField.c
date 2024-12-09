@@ -120,7 +120,7 @@ void checkDanger()
     }
 }
 /*
-    Pulizia STDIN con reset del terminale
+    Pulizia STDIN con escape character e tcflush per la pulizia del buffer
 */
 void cleanStdin()
 {
@@ -270,12 +270,13 @@ void gameOver()
         "/ /_/ / |/ / _// , _/   ",
         "\\____/|___/___/_/|_|    ",
         "                        "};
-    printf("\n");
+    cleanStdin();
     for (int i = 0; i < 8; i++)
     {
-        cleanStdin();
+
         printf("%s\n", gameOverText[i]);
     }
+    printf("\n");
 }
 /*
     Funzione interna per controllare la collisione tra la nave e un meteorite
@@ -287,6 +288,8 @@ void checkCollision(char *actualRow, char *rowBefore)
     int col = 0;
     while (col < COLUMNS)
     {
+        // Controllo per la collisione tra nave e meteorite nella riga precedente
+        // prima di aggiornare la griglia di gioco
         if (actualRow[col] == SHIP_CELL && rowBefore[col] == METEORITE_CELL)
         {
             // Game over
@@ -294,6 +297,7 @@ void checkCollision(char *actualRow, char *rowBefore)
             freeGrid();
             exit(EXIT_SUCCESS); // Uscita dal gioco
         }
+        col++;
     }
 }
 /*
