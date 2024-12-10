@@ -8,9 +8,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <pthread.h>
+#include <string.h>
 #include "customErrorPrinting.h"
 
 #define FIFO_PATH "/tmp/gameFifo"
+pthread_mutex_t fifoMutex = PTHREAD_MUTEX_INITIALIZER;
 
 // File descriptor per la FIFO
 int fifoFd = -1;
@@ -20,6 +23,13 @@ int fifoFd = -1;
 */
 extern void createFifo()
 {
+    // Controllo se la FIFO esiste già
+    if (access(FIFO_PATH, F_OK) != -1)
+    {
+        // Ritorno se la FIFO esiste già
+        printf("[INFO] La FIFO esiste già\n");
+        return;
+    }
 
     // Creazione della FIFO
     if (mkfifo(FIFO_PATH, 0666) == -1)
@@ -52,7 +62,7 @@ extern int getFifoFd()
 */
 extern void setFifoFd()
 {
-    // Apertura della FIFO in lettura e scrittura
+    // Apertura della FIFO in lettura e scrittura non bloccante
     fifoFd = open(FIFO_PATH, O_RDWR | O_NONBLOCK);
     if (fifoFd == -1)
     {
@@ -91,4 +101,66 @@ extern void deleteFifo()
             printf("[INFO] FIFO rimossa con successo\n");
         }
     }
+}
+/*
+    Funzione per la scrittura sulla FIFO in mutua esclusione
+    e controllo dell'errore
+    @param buffer: buffer da scrivere sulla FIFO
+    @return: numero di byte scritti sulla FIFO
+*/
+extern int customFifoWrite(char *buffer)
+{
+    // Lock del mutex solo 1 thread alla volta può scrivere sulla FIFO
+    pthread_mutex_lock(&fifoMutex);
+    int bytesWritten = write(fifoFd, buffer, strlen(buffer) + 1);
+    pthread_mutex_unlock(&fifoMutex);
+
+    // Controllo dell'errore
+    if (bytesWritten == -1)
+    {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+            // Nessun messaggio da ricevere
+            // Continua il ciclo
+            return 0;
+        }
+        else
+        {
+            customErrorPrinting("[ERROR] write(): Errore nella scrittura sulla FIFO\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return bytesWritten;
+}
+/*
+    Funzione per la lettura dalla FIFO in mutua esclusione
+    e controllo dell'errore
+    @param buffer: buffer in cui salvare il messaggio letto dalla FIFO
+    @return: numero di byte letti dalla FIFO
+*/
+extern int customFifoRead(char *buffer)
+{
+    // Lock del mutex solo 1 thread alla volta può leggere dalla FIFO
+    pthread_mutex_lock(&fifoMutex);
+    int bytesRead = read(fifoFd, buffer, 20);
+    pthread_mutex_unlock(&fifoMutex);
+
+    // Controllo dell'errore
+    if (bytesRead == -1)
+    {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+            // Nessun messaggio da ricevere
+            // Continua il ciclo
+            return 0;
+        }
+        else
+        {
+            customErrorPrinting("[ERROR] read(): Errore nella lettura dalla FIFO\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return bytesRead;
 }

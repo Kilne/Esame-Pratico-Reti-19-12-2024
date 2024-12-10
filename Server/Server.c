@@ -40,10 +40,10 @@ int main(int argc, char const *argv[])
 
     // Inizializzazione del buffer per la ricezione dei messaggi
     char *messageBuffer = getStdUDPMessage();
-    int isGameStarted = 0;
 
     // Inizializzazione della struttura per la ricezione dell'indirizzo del client da messaggi
-    struct sockaddr_in clientAddr;
+    struct sockaddr_in clientAddr[50];
+    int lastClient = 0;
 
     // Inzializzazione del buffer che contiene le future posizioni per i meteoriti
     // Generate casualmente
@@ -62,22 +62,33 @@ int main(int argc, char const *argv[])
         // Ogni 2 si generano nuove posizioni per i meteoriti
         sleep(2);
         generateMeteorites(meteoritesBuffer, 20);
+        printf("[INFO] Nuove posizioni per i meteoriti generate: %s\n", meteoritesBuffer);
         // Ricezione del messaggio dal client
-        customRecvFrom(serverSocket, messageBuffer, &clientAddr);
-        if (strcmp(messageBuffer, "START") == 0 && isGameStarted == 0)
+        customRecvFrom(serverSocket, messageBuffer, &clientAddr[lastClient]);
+        if (strcmp(messageBuffer, "START") == 0)
         {
-            // Invio delle posizioni dei meteoriti al client
-            isGameStarted = 1;
-            printf("[INFO] Inizio del gioco\n");
+            // Invio delle posizioni dei meteoriti ai client
+            printf("[INFO] Nuovo client nella coda.\n");
+            lastClient++;
+            if (lastClient > 50)
+            {
+                lastClient = 50;
+            }
             freeUDPMessage(messageBuffer);
             messageBuffer = getStdUDPMessage();
         }
-        if (isGameStarted == 1)
+
+        for (int i = 0; i < 50; i++)
         {
+            if (&clientAddr[i] == NULL)
+            {
+                continue;
+            }
             // Invio delle posizioni dei meteoriti al client
-            customSendTo(serverSocket, meteoritesBuffer, &clientAddr);
-            memset(messageBuffer, 0, 20);
+            customSendTo(serverSocket, meteoritesBuffer, &clientAddr[i]);
         }
+
+        memset(messageBuffer, 0, 20);
     }
 
     return 0;

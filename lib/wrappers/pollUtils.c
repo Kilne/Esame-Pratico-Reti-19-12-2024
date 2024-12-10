@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
+#include <unistd.h>
 #include "customErrorPrinting.h"
 
 // Epoll file descriptor

@@ -19,7 +19,7 @@
     @serverRecviedFrom: struttura per l'indirizzo del server da cui è stato ricevuto il messaggio
     @return: la lunghezza del messaggio ricevuto
 */
-extern ssize_t customRecvFrom(int socktToRecv, char *messageBuffer, struct sockaddr_in *serverRecviedFrom)
+extern int customRecvFrom(int socktToRecv, char *messageBuffer, struct sockaddr_in *serverRecviedFrom)
 {
     // Impostazione della dimensione del buffer
     size_t messageBufferSize = 512; // Dimensione standard del buffer per i messaggi UDP
@@ -28,10 +28,10 @@ extern ssize_t customRecvFrom(int socktToRecv, char *messageBuffer, struct socka
     socklen_t serverAddrSize = sizeof(serverAddr);
 
     // Ricezione del messaggio
-    ssize_t recvFromResult = recvfrom(socktToRecv, messageBuffer, messageBufferSize, 0, serverAddr, &serverAddrSize);
+    int recvFromResult = recvfrom(socktToRecv, messageBuffer, messageBufferSize, 0, serverAddr, &serverAddrSize);
 
-        // Ricezione del messaggio
-        if (recvFromResult < 0)
+    // Ricezione del messaggio
+    if (recvFromResult < 0)
     {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
@@ -47,7 +47,7 @@ extern ssize_t customRecvFrom(int socktToRecv, char *messageBuffer, struct socka
     }
 
     // Avviso di ricezione del messaggio in caso di successo
-    printf("[INFO] Messaggio ricevuto con recvFrom()\n");
+    printf("[INFO] Messaggio ricevuto con recvFrom() %d bytes\n", recvFromResult);
 
     // Ritorno del risultato della recvfrom, la lunghezza del messaggio ricevuto
     // non è necessaria in quanto la recvfrom restituisce l'indiritto del mittente

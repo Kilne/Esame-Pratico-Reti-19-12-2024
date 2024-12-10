@@ -27,12 +27,13 @@ extern void customSendTo(int socketToUse, char *messageBuffer, const struct sock
     struct sockaddr *serverAddr = (struct sockaddr *)serverAddress;
 
     // Invio del messaggio al server
-    if (sendto(socketToUse, messageBuffer, messageSize, 0, serverAddr, serverAddressSize) == -1)
+    int bytes = sendto(socketToUse, messageBuffer, messageSize, 0, serverAddr, serverAddressSize);
+    if (bytes == -1)
     {
         customErrorPrinting("SendTo: Errore nell'invio del messaggio al server\n");
         exit(EXIT_FAILURE);
     }
 
     // Avviso di invio del messaggio al server in caso di successo
-    printf("[INFO] Messaggio inviato con sendTo()\n");
+    printf("[INFO] Messaggio inviato con sendTo() di %d bytes\n", bytes);
 }

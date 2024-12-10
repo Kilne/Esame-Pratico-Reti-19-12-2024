@@ -13,5 +13,9 @@ extern int getFifoFd();
 extern void setFifoFd();
 // Chiusura della FIFO, cancellazione e reset del file descriptor
 extern void deleteFifo();
+// Scrittura sulla FIFO in mutua esclusione
+extern int customFifoWrite(char *buffer);
+// Lettura dalla FIFO in mutua esclusione
+extern int customFifoRead(char *buffer);
 
 #endif // LIB__WRAPPERS__CUSTOMFIFOTOOLS_H

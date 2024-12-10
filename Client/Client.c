@@ -18,13 +18,10 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <signal.h>
-
-#define PID_PATH "/tmp/gamePid" // Questo è il file in cui scrivo il PID del motore di gioco
+#include <unistd.h>
 
 int main(int argc, char const *argv[])
 {
-    // Eliminazione della FIFO se esiste in uscita
-    atexit(deleteFifo);
 
     // Controllo degli argomenti
     checkArgs(argc);
@@ -54,15 +51,15 @@ int main(int argc, char const *argv[])
         sapere a priori la dimensione del buffer in arrivo ( standard UDP a 512 byte)
         e dovrebbe essere in grado di riallocare la memoria per il buffer in arrivo.
     */
-    int meteorStored = 0; // Contatore per i buffer delle meteore
+    int meteorStored = -1; // Contatore per i buffer delle meteore parte da meno 1 per l'array 0 based
     // Per scelta di design del gioco massimo 20 buffer di meteore
     char **messageBuffer = calloc(20, sizeof(char *));
 
+    // Buffer per la ricezione dei messaggi dalla FIFO
+    char *bufferReceived = calloc(20, sizeof(char));
+
     // Special connect
     customConnection_init(clientSocket, &serverAddr);
-
-    // Inzia il gioco
-    customSend(clientSocket, "START");
 
     /*
         TODO:
@@ -73,7 +70,7 @@ int main(int argc, char const *argv[])
                 - Ogni volta che mandi una FIFO al gioco libera il buffer per un messaggio                          [DONE?]
             - Utilizzo della FIFO per la comunicazione con il gioco                                                 [DONE]
             - Implementare la terminazione del gioco, con Epoll emettere un evento sulla FIFO e far chiudere il Client(previa disconnect)
-                attraverso un ultimo messaggio al client per togliere la propria entry dalla lista di quelli in ascolto.
+                attraverso un ultimo messaggio al client per togliere la propria entry dalla lista di quelli in ascolto. [FAILED]
             - Indagare sulla possibile morte del server con errore ICMP e propagare l'errore al gioco ed il client,
                 probabilemnte un timeout -> retry -> ICMP x 3 -> terminazione
             - Chiusura/Delete della FIFO al termine del gioco/client con atexit                                     [DONE]
@@ -90,6 +87,7 @@ int main(int argc, char const *argv[])
     // Apertura del terminal con spawn di un processo figlio dedito al gioco
     int systemResult = 0;
 #ifdef __linux__
+    // system("gnome-terminal -- bash -c 'cd Builds; ./Game; exec bash'");
     systemResult = system("gnome-terminal -- ./Game");
     if (systemResult == -1)
     {
@@ -104,105 +102,76 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 #endif
-    // Lettura del PID del gioco
-    pid_t gamePid = 0;
-    FILE *pidFile = fopen(PID_PATH, "r");
-    if (pidFile == NULL)
-    {
-        customErrorPrinting("[ERROR] fopen(): Errore nell'apertura del file PID\n");
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-        fscanf(pidFile, "%d", &gamePid);
-        fclose(pidFile);
-        printf("[INFO] PID del gioco: %d\n", gamePid);
-    }
 
     // Inizializzazione della pipeline per la comunicazione con il gioco
     createFifo();
     setFifoFd();
-    addFileDescriptorToThePolling(getFifoFd(), EPOLLIN | EPOLLOUT); // Aggiunta della FIFO al polling
+    printf("[INFO] FIFO aperta dal client su file descriptor: %d\n", getFifoFd());
+    addFileDescriptorToThePolling(getFifoFd(), EPOLLIN | EPOLLOUT);
 
     // Segnale per la terminazione del gioco
     int gameTerminated = 0;
+
+    // Inzia il gioco
+    customSend(clientSocket, "START");
+    // Stringa di controllo chiusura del gioco
+    char *gameEndString = "GAME OVER";
+
     // Ciclo di gioco
     while (gameTerminated == 0)
     {
-        // Attesa degli eventi di I/O, valore arbitrario di 156
-        struct epoll_event fdEvents[150];
-        int triggeredEvents = waitForEvents(fdEvents, 150);
+        // Attesa degli eventi di I/O
+        struct epoll_event fdEvents[10];
+        int triggeredEvents = waitForEvents(fdEvents, 10);
 
         // Logica evento per evento
         for (int i = 0; i < triggeredEvents; i++)
         {
             // Controllo se il socket è pronto per la lettura
-            if (fdEvents[i].data.fd == clientSocket && EPOLLIN)
+            if (fdEvents[i].data.fd == clientSocket)
             {
                 // Ricezione del messaggio
                 // Per scelta di design del gioco il client scarta i messaggi se ha già 20 buffer
-                if (meteorStored < 20)
+                if (meteorStored != 19)
                 {
+                    // Incremento il contatore delle meteore PRIMA di ricevere il buffer perchè è 0 based
+                    meteorStored++;
                     // Se posso ricevere il buffer, lo ricevo allocando un buffer standard UDP
                     // alla posizione meteorStored
                     messageBuffer[meteorStored] = getStdUDPMessage();
 
                     // Il contatore delle meteore è anche indice di quale è il buffer da riempire
                     customRecv(clientSocket, messageBuffer[meteorStored]);
-
-                    // Incremento il contatore delle meteore
-                    meteorStored++;
+                    printf("[INFO] Ricevuto buffer dal server: %s\n", messageBuffer[meteorStored]);
                 }
             }
-            // Controllo se la FIFO è pronta per la scrittura
-            else if (fdEvents[i].data.fd == getFifoFd() && EPOLLOUT)
+            // Controllo se la FIFO è pronta
+            else if (fdEvents[i].data.fd == getFifoFd())
             {
-                // Invio del buffer alla FIFO
-                int bytesSentToFifo = 0;
-                bytesSentToFifo = (getFifoFd(), messageBuffer[meteorStored], 20);
-                if (bytesSentToFifo == -1)
+                if (fdEvents[i].events & EPOLLOUT)
                 {
-                    customErrorPrinting("[ERROR] write(): Errore nell'invio del buffer alla FIFO\n");
-                    exit(EXIT_FAILURE);
-                }
-                else
-                {
-                    /*
-                        TODO:
-                            - Dopo aver inviato il buffer tramite FIFO liberare il buffer
-                                ad operazione compiuta. e decrementare il contatore delle meteore. [DONE?]
-                    */
-                    // Libero il buffer se è possibile
-                    if (meteorStored > 0)
+                    // Invio del buffer alla FIFO
+                    int sentBytesToFifo = 0;
+                    if (meteorStored != -1)
                     {
+                        // RAGIONEVOLMENTE non dovrei passare array nulli alla FIFO con il contatore
+                        sentBytesToFifo = customFifoWrite(messageBuffer[meteorStored]);
+                        printf("[INFO] Inviati %d byte alla FIFO: %s\n", sentBytesToFifo, messageBuffer[meteorStored]);
+                        // Libero il buffer per il prossimo messaggio
                         freeUDPMessage(messageBuffer[meteorStored]);
+                        // Decremento il contatore delle meteore
                         meteorStored--;
                     }
                 }
-            }
-            // Controllo FIFO in lettura
-            else if (fdEvents[i].data.fd == getFifoFd() && EPOLLIN)
-            {
-                // Lettura dalla FIFO
-                char *buffer = "GAME OVER";
-                char *bufferReceived = calloc(10, sizeof(char));
-                int bytesReceived = read(getFifoFd(), bufferReceived, 10);
-                if (bytesReceived == -1)
+                else if (fdEvents[i].events & EPOLLIN)
                 {
-                    customErrorPrinting("[ERROR] read(): Errore nella lettura dalla FIFO\n");
-                    exit(EXIT_FAILURE);
-                }
-                if (strcmp(buffer, bufferReceived) == 0)
-                {
-                    // Game over procedi alla terminazione del gioco
-                    printf("[INFO] Terminazione del gico in corso\n");
-                    if (kill(gamePid, SIGKILL) == -1)
+                    // Lettura dalla FIFO
+                    int bytesReceived = customFifoRead(bufferReceived);
+                    printf("[INFO] Letti %d byte dalla FIFO: %s\n", bytesReceived, bufferReceived);
+                    if (strcmp(gameEndString, bufferReceived) == 0)
                     {
-                        customErrorPrinting("[ERROR] kill(): Errore nella terminazione del gioco\n");
-                        exit(EXIT_FAILURE);
-                    }
-                    else
-                    {
+                        // Game over procedi alla terminazione del gioco
+                        printf("[INFO] Terminazione del gico in corso\n");
                         gameTerminated = 1;
                     }
                 }
@@ -210,27 +179,30 @@ int main(int argc, char const *argv[])
         }
     }
 
-    // Disconnessione dal server
-    customDisconnect(clientSocket);
-
-    // Chiusura dell'istanza di epoll
-    removeFileDescriptorFromThePolling(clientSocket);
-    removeFileDescriptorFromThePolling(getFifoFd());
-    closeEpoll();
-
-    // Chiusura della FIFO
-    deleteFifo();
-
-    // Chiusura del socket
-    if (close(clientSocket) == -1)
+    if (gameTerminated == 1)
     {
-        customErrorPrinting("[ERROR] close(): Errore nella chiusura del socket\n");
-        exit(EXIT_FAILURE);
-    }
+        // Disconnessione dal server
+        customDisconnect(clientSocket);
 
-    // Liberazione della memoria allocata per la struttura del server
-    free(messageBuffer);
-    free(&serverAddr);
+        // Chiusura dell'istanza di epoll
+        removeFileDescriptorFromThePolling(clientSocket);
+        removeFileDescriptorFromThePolling(getFifoFd());
+        closeEpoll();
+
+        // Chiusura della FIFO
+        deleteFifo();
+
+        // Chiusura del socket
+        if (close(clientSocket) == -1)
+        {
+            customErrorPrinting("[ERROR] close(): Errore nella chiusura del socket\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Liberazione della memoria allocata per la struttura del server
+        free(messageBuffer);
+        free(bufferReceived);
+    }
 
     return 0;
 }

@@ -9,10 +9,10 @@
 #include <termios.h>
 #include "../wrappers/customErrorPrinting.h"
 
-#define ROWS 21 // 20 righe di gioco + 1 riga di avviso
-#define COLUMNS 20
+#define ROWS 11    // 10 righe di gioco + 1 riga di avviso
+#define COLUMNS 20 // 20 colonne di gioco
 
-#define EMPTY_CELL ' '
+#define EMPTY_CELL '.'
 #define METEORITE_CELL 'o'
 #define SHIP_CELL '^'
 #define EXPLOSION_CELL 'X'
@@ -30,35 +30,34 @@ char **grid;
 int shipPosition = 9; // Posizione iniziale e centrale
 // Perciolo collisione attivo
 int dangerActive = 0;
+// Prossimo avanzamento della griglia di gioco
+int nextRow = 1;
 
 /*
     Inizializzazione della griglia di gioco
 */
 extern void init()
 {
-    // Allocazione della memoria per la griglia di gioco
+    // Allocazione 20 righe con calloc per la griglia di gioco
     grid = calloc(ROWS, sizeof(char *));
 
-    for (int i = 0; i < ROWS; i++)
+    // Allocazione delle colonne per ogni riga
+    for (int i = 0; i <= ROWS; i++)
     {
         grid[i] = calloc(COLUMNS, sizeof(char));
     }
 
-    // Inizializzazione della griglia di gioco
+    // Ogni cella della griglia è inizializzata con EMPTY_CELL
     for (int i = 0; i < ROWS; i++)
     {
         for (int j = 0; j < COLUMNS; j++)
         {
-            if (i == ROWS - 1 && j == shipPosition)
-            {
-                grid[i][j] = SHIP_CELL;
-            }
-            else
-            {
-                grid[i][j] = EMPTY_CELL;
-            }
+            grid[i][j] = EMPTY_CELL;
         }
     }
+
+    // Posizione iniziale della nave
+    grid[ROWS - 2][shipPosition] = SHIP_CELL;
 }
 /*
     Funzione per muovere la nave di gioco
@@ -74,20 +73,20 @@ extern void shipMovement(int move)
     if (move == 1)
     {
         // Controllo per il movimento a destra
-        if ((shipPosition + move) < (COLUMNS - 1))
+        if ((shipPosition + move) < COLUMNS)
         {
-            grid[ROWS - 1][shipPosition] = EMPTY_CELL;
-            grid[ROWS - 1][shipPosition + 1] = SHIP_CELL;
-            shipPosition++; // Aggiornamento della posizione
+            grid[ROWS - 2][shipPosition] = EMPTY_CELL;
+            grid[ROWS - 2][shipPosition + 1] = SHIP_CELL;
+            shipPosition++;
         }
     }
     else if (move == -1)
     {
         // Controllo per il movimento a sinistra
-        if ((shipPosition - move) > 0)
+        if ((shipPosition - move) > 1)
         {
-            grid[ROWS - 1][shipPosition] = EMPTY_CELL;
-            grid[ROWS - 1][shipPosition - 1] = SHIP_CELL;
+            grid[ROWS - 2][shipPosition] = EMPTY_CELL;
+            grid[ROWS - 2][shipPosition - 1] = SHIP_CELL;
             shipPosition--;
         }
     }
@@ -101,22 +100,32 @@ void checkDanger()
     // In corrispondenza della posizione della nave, se almeno 5 righe sopra
     // c'è un meteorite, viene mostrato un avviso di pericolo
     // nella riga di avviso apposita.
-    for (int i = ROWS - 2; i < (ROWS - 2 - DANGER_RANGE); i--)
+    int firstRowToCheck = ROWS - 3;                      // Riga 18 sopra la nave
+    int lastRowToCheck = firstRowToCheck - DANGER_RANGE; // Riga 13 sopra la nave
+    int danger = 0;
+    for (int i = firstRowToCheck; i < lastRowToCheck; i--)
     {
         if (grid[i][shipPosition] == METEORITE_CELL)
         {
-            dangerActive = 1;
-            grid[ROWS - 1] = DANGER_MESSAGE;
+            danger = 1;
             break;
         }
     }
-    if (dangerActive == 1) // Se il pericolo è passato, si resetta la riga di avviso
+    dangerActive = danger;
+    // Se c'è pericolo, viene mostrato l'avviso
+    if (dangerActive == 1)
     {
-        for (int i = 0; i < COLUMNS; i++)
+        for (int i = 0; i < strlen(DANGER_MESSAGE); i++)
+        {
+            grid[ROWS - 1][i] = DANGER_MESSAGE[i];
+        }
+    }
+    else
+    {
+        for (int i = 1; i < COLUMNS; i++)
         {
             grid[ROWS - 1][i] = EMPTY_CELL;
         }
-        dangerActive = 0;
     }
 }
 /*
@@ -137,6 +146,29 @@ void cleanStdin()
         customErrorPrinting("[ERROR] tcflush() fallita\n");
         exit(EXIT_FAILURE);
     }
+}
+/*
+    Funzione interna per la schermata di game over
+*/
+void gameOver()
+{
+    // Ascii art per il game over
+    char *gameOverText[] = {
+        "  ________   __  _______",
+        " / ___/ _ | /  |/  / __/",
+        "/ (_ / __ |/ /|_/ / _/  ",
+        "\\___/_/_|_/_/__/_/___/  ",
+        " / __ \\ | / / __/ _ \\   ",
+        "/ /_/ / |/ / _// , _/   ",
+        "\\____/|___/___/_/|_|    ",
+        "                        "};
+    cleanStdin();
+    for (int i = 0; i < 8; i++)
+    {
+
+        printf("%s\n", gameOverText[i]);
+    }
+    printf("\n");
 }
 /*
     Manipolazione terminale per la lettura di un singolo carattere
@@ -169,35 +201,22 @@ extern void setTerminalMode(int mode)
     tcsetattr(STDIN_FILENO, TCSANOW, &termios_p);
 }
 /*
-    Rimozione della grid di gioco e deallocazione della memoria
-*/
-extern void freeGrid()
-{
-    for (int i = 0; i < ROWS; i++)
-    {
-        free(grid[i]);
-    }
-    free(grid);
-    shipPosition = 9;
-}
-/*
     Funzione per monitorare l'input da tastiera
     e reagire ai comandi di movimento della nave,
     in aggiunta alla terminazione del gioco da parte
     dell'utente.
     @param input: input da tastiera
     @param inputSize: dimensione dell'input
+    @return: 0 se l'input non è di chiusura del gioco, 1 altrimenti.
 */
-extern void checkTheInput(char *input, int inputSize)
+extern int checkTheInput(char *input, int inputSize)
 {
     // Gli input essendo tutti in raw mode non hanno null terminator
     // Per fare quindi dei controlli con stringhe predefinite, si
     // deve aggiungere il null terminator manualmente.
     input[inputSize] = '\0';
 
-    // Controllo per la terminazione del gioco
-
-    // Controllo per il movimento della nave
+    // Controllo tipo di input ricevuto
     if (strcmp(input, LEFT_ARROW) == 0)
     {
         shipMovement(-1);
@@ -209,12 +228,11 @@ extern void checkTheInput(char *input, int inputSize)
     else if (strcmp(input, "q") == 0)
     {
         setTerminalMode(0);
-        cleanStdin();
-        freeGrid();
+        gameOver();
         printf("Uscita dal gioco a breve.\n");
-        sleep(2);
-        exit(EXIT_SUCCESS);
+        return 1; // Chiusura del gioco
     }
+    return 0; // Nessuna chiusura del gioco
 }
 /*
     Stampa la griglia di gioco
@@ -243,7 +261,7 @@ extern void addMeteors(char *newRowBuffer)
 {
     // I meteoriti sono rappresentati da 'o' nella griglia
     // E sono inseriti sempre a partire dalla griglia 0
-    for (int i = 0; i < COLUMNS; i++)
+    for (int i = 1; i < COLUMNS; i++)
     {
         if (newRowBuffer[i] == '1')
         {
@@ -256,77 +274,54 @@ extern void addMeteors(char *newRowBuffer)
     }
 }
 /*
-    Funzione interna per la schermata di game over
+    Funzione interna per controllare la collisione tra nave e meteorite
 */
-void gameOver()
+int checkCollision()
 {
-    // Ascii art per il game over
-    char *gameOverText[] = {
-        "  ________   __  _______",
-        " / ___/ _ | /  |/  / __/",
-        "/ (_ / __ |/ /|_/ / _/  ",
-        "\\___/_/_|_/_/__/_/___/  ",
-        " / __ \\ | / / __/ _ \\   ",
-        "/ /_/ / |/ / _// , _/   ",
-        "\\____/|___/___/_/|_|    ",
-        "                        "};
-    cleanStdin();
-    for (int i = 0; i < 8; i++)
+    // Controllo collisione tra la riga della nave e la riga subito sopra
+    for (int i = 1; i < COLUMNS; i++)
     {
-
-        printf("%s\n", gameOverText[i]);
-    }
-    printf("\n");
-}
-/*
-    Funzione interna per controllare la collisione tra la nave e un meteorite
-    @param actualRow: riga attuale
-    @param rowBefore: riga precedente
-*/
-void checkCollision(char *actualRow, char *rowBefore)
-{
-    int col = 0;
-    while (col < COLUMNS)
-    {
-        // Controllo per la collisione tra nave e meteorite nella riga precedente
-        // prima di aggiornare la griglia di gioco
-        if (actualRow[col] == SHIP_CELL && rowBefore[col] == METEORITE_CELL)
+        if (grid[ROWS - 2][i] == SHIP_CELL && grid[ROWS - 3][i] == METEORITE_CELL)
         {
-            // Game over
-            gameOver();
-            freeGrid();
-            exit(EXIT_SUCCESS); // Uscita dal gioco
+            return 1; // Collisione
         }
-        col++;
     }
+    return 0; // Nessuna collisione
 }
 /*
     Scorre la griglia di gioco verso il basso
+    @return: 0 se non c'è game over, 1 altrimenti.
 */
-extern void redrawRowsTicker()
+extern int redrawRowsTicker()
 {
-    // Partendo dalla penultima riga, scorro verso il basso
-    // Riga di avviso esclusa
-    int startingRefreshRow = ROWS - 2;
-
-    /*
-        Partendo dall'ultima riga, copio la riga precedente
-        Facendo un controllo se la posizione della nave e un meteorite
-        coincido, in quel caso la partita è persa.
-
-        Se la posizione della nave è uguale verticalemente a quella di un meteorite
-        almeno 5 righe sopra la nave, viene mostrato un avviso di pericolo.
-    */
-    for (int i = 0; i < COLUMNS; i++)
-    {
-        // Ciclo all'indietro colonna per colonna
-        // ed ogni riga viene copiata nella riga successiva
-        for (int j = startingRefreshRow; j == 0; j--)
-        {
-            checkCollision(grid[j], grid[j - 1]);
-            grid[j][i] = grid[j - 1][i];
-        }
-    }
     // Controllo per l'avviso di pericolo
     checkDanger();
+    // Controllo per la collisione tra nave e meteorite
+    if (checkCollision() == 1)
+    {
+        setTerminalMode(0);
+        gameOver();
+        printf("Game over, uscita dal gioco a breve.\n");
+        return 1; // Game over
+    }
+    // Avanzamento della griglia di gioco
+    for (int i = nextRow; i > 0; i--)
+    {
+        for (int j = 1; j < COLUMNS; j++)
+        {
+            // Copia della riga superiore in quella inferiore
+            grid[i][j] = grid[i - 1][j];
+            // Pulizia della riga superiore
+            grid[i - 1][j] = EMPTY_CELL;
+        }
+    }
+    nextRow++; // Incremento della prossima riga
+    if (nextRow == ROWS - 1)
+    {
+        nextRow--;
+    }
+    // Stampa della griglia di gioco
+    printGrid();
+
+    return 0; // Nessun game over
 }
