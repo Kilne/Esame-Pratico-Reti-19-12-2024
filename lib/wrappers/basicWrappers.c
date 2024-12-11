@@ -52,15 +52,25 @@ extern void wrappedSocketOpt(int sockfd)
     timeout.tv_sec = 10;
     timeout.tv_usec = 0;
 
-    // Setting options for reuse and timeout
+    /*
+        Aggiunta opzioni per il socket:
+            - SO_REUSEADDR: riutilizzo dell'indirizzo
+            - SO_RCVTIMEO: timeout per la ricezione dei messaggi
+            - IP_RECVERR: ricezione degli errori di rete ICMP asincroni per il socket UDP
+    */
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0)
     {
-        customErrorPrinting("setsockopt: SO_REUSEADDR\n");
+        customErrorPrinting("[ERROR] setsockopt: SO_REUSEADDR\n");
         exit(EXIT_FAILURE);
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
     {
-        customErrorPrinting("setsockopt: SO_RCVTIMEO\n");
+        customErrorPrinting("[ERROR] setsockopt: SO_RCVTIMEO\n");
+        exit(EXIT_FAILURE);
+    }
+    if (setsockopt(sockfd, SOL_IP, IP_RECVERR, &enableReuse, sizeof(int)) < 0)
+    {
+        customErrorPrinting("[ERROR] setsockopt: IP_RECVERR\n");
         exit(EXIT_FAILURE);
     }
 }

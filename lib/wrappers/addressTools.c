@@ -46,7 +46,7 @@ extern void setGenericIPV4(char *ip, struct in_addr *addr)
 */
 extern char *getIPV4HostDecimal(struct in_addr *addr)
 {
-    static char ip[INET_ADDRSTRLEN];
+    char *ip = malloc(INET_ADDRSTRLEN);
     if (inet_ntop(AF_INET, addr, ip, INET_ADDRSTRLEN) == NULL)
     {
         customErrorPrinting("Errore GETIPV4: conversione ad indirizzo IP non riuscita\n");
@@ -77,11 +77,17 @@ extern uint16_t getRadnomPort()
 extern char *getAddressString(struct sockaddr_in *addr)
 {
     // Buffer per l'indirizzo e la porta
-    static char address[INET_ADDRSTRLEN + 6];
+    char *address = calloc(INET_ADDRSTRLEN + 6, sizeof(char));
     // Conversione dell'indirizzo IP e della porta in stringa
-    char *ip = getIPV4HostDecimal(&addr->sin_addr);
-    snprintf(address,sizeof(address), "%s:%d", ip, ntohs(addr->sin_port));
-
+    char *addressDec = getIPV4HostDecimal(&addr->sin_addr);
+    // Concatenazione dell'indirizzo e della porta
+    strcpy(address, addressDec);
+    strcat(address, ":");
+    char *port = calloc(6, sizeof(char));
+    sprintf(port, "%d", ntohs(addr->sin_port));
+    strcat(address, port);
+    // Deallocazione della memoria
+    free(addressDec);
     return address;
 }
 /*

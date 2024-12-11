@@ -26,7 +26,7 @@ extern void customConnection_init(int socket, struct sockaddr_in *serverAddr)
     }
     else
     {
-        fprintf(stdout, "[INFO] Connesso al server.\n");
+        fprintf(stdout, "[INFO] Indirizzo server registrato.\n");
     }
 }
 

@@ -86,7 +86,6 @@ int main(int argc, char const *argv[])
 
     // Apertura del terminal con spawn di un processo figlio dedito al gioco
     int systemResult = 0;
-#ifdef __linux__
     // system("gnome-terminal -- bash -c 'cd Builds; ./Game; exec bash'");
     systemResult = system("gnome-terminal -- ./Game");
     if (systemResult == -1)
@@ -94,14 +93,6 @@ int main(int argc, char const *argv[])
         customErrorPrinting("[ERROR] Apertura del terminale fallita\n");
         exit(EXIT_FAILURE);
     }
-#elif __APPLE__
-    systemResult = system("open -a Terminal ./Game");
-    if (systemResult == -1)
-    {
-        customErrorPrinting("[ERROR] Apertura del terminale fallita\n");
-        exit(EXIT_FAILURE);
-    }
-#endif
 
     // Inizializzazione della pipeline per la comunicazione con il gioco
     createFifo();
@@ -113,7 +104,12 @@ int main(int argc, char const *argv[])
     int gameTerminated = 0;
 
     // Inzia il gioco
-    customSend(clientSocket, "START");
+    int sendRes = customSend(clientSocket, &serverAddr, "START");
+    if (sendRes == 1)
+    {
+        customErrorPrinting("[ERROR] Il server non è raggiungibile\n");
+        exit(EXIT_FAILURE);
+    }
     // Stringa di controllo chiusura del gioco
     char *gameEndString = "GAME OVER";
 

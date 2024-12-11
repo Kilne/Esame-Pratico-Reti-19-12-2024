@@ -8,7 +8,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include "customErrorPrinting.h"
+#include "customICMP.h"
 
 /*
     Funzione che invia un messaggio al server tramite il socket passato come argomento.
@@ -17,8 +19,9 @@
     @socketToUse: file descriptor del socket
     @messageBuffer: buffer per il messaggio da inviare
     @serverAddress: struttura per l'indirizzo del server a cui inviare il messaggio
+    @return: 1 se il client a cui si sta mandando il messaggio non è raggiungibile
 */
-extern void customSendTo(int socketToUse, char *messageBuffer, const struct sockaddr_in *serverAddress)
+extern int customSendTo(int socketToUse, char *messageBuffer, struct sockaddr_in *serverAddress)
 {
     // Variabili per la dimensione dell'indirizzo del server e del messaggio
     socklen_t serverAddressSize = sizeof(*serverAddress);
@@ -30,10 +33,17 @@ extern void customSendTo(int socketToUse, char *messageBuffer, const struct sock
     int bytes = sendto(socketToUse, messageBuffer, messageSize, 0, serverAddr, serverAddressSize);
     if (bytes == -1)
     {
-        customErrorPrinting("SendTo: Errore nell'invio del messaggio al server\n");
+        customErrorPrinting("[ERROR] SendTo(): Errore nell'invio del messaggio al server\n");
         exit(EXIT_FAILURE);
+    }
+
+    // Controllo errori ICMP asincroni
+    if (detectICMP(socketToUse, serverAddress) == 1)
+    {
+        return 1;
     }
 
     // Avviso di invio del messaggio al server in caso di successo
     printf("[INFO] Messaggio inviato con sendTo() di %d bytes\n", bytes);
+    return bytes;
 }

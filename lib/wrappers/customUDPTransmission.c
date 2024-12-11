@@ -9,14 +9,17 @@
 #include <netinet/in.h>
 #include <string.h>
 #include "customErrorPrinting.h"
+#include "customICMP.h"
 #include "bufHandlers.h"
 
 /*
     Funzione che effettua la send su un socket UDP connesso.
     @param socket: il socket su cui effettuare la send
+    @param server: l'indirizzo del server a si sta inviano il messaggio per il controllo ICMP
     @param buffer: il buffer da inviare
+    @return: 1 se il client a cui si sta mandando il messaggio non è raggiungibile, 0 altrimenti
 */
-extern void customSend(int socket, char *buffer)
+extern int customSend(int socket, struct sockaddr_in *server, char *buffer)
 {
     // Calcolo della dimensione del buffer + 1 per il terminatore
     // perché strlen non conta il terminatore.
@@ -27,12 +30,19 @@ extern void customSend(int socket, char *buffer)
     // Controllo dell'invio
     if (sent == -1)
     {
+
         customErrorPrinting("[ERROR] send(): la funzione ha generato un errore.\n");
-        exit(EXIT_FAILURE);
+        return 1;
     }
     else
     {
+        // Controllo degli errori ICMP asincroni che non sono visti da send a differenza di recv
+        if (detectICMP(socket, server) == 1)
+        {
+            return 1;
+        }
         fprintf(stdout, "[INFO] Inviati: %d byte\n", sent);
+        return 0;
     }
 }
 /*

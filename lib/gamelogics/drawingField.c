@@ -13,6 +13,7 @@
 #define COLUMNS 20 // 20 colonne di gioco
 
 #define EMPTY_CELL '.'
+#define VOID_CELL ' '
 #define METEORITE_CELL 'o'
 #define SHIP_CELL '^'
 #define EXPLOSION_CELL 'X'
@@ -42,13 +43,13 @@ extern void init()
     grid = calloc(ROWS, sizeof(char *));
 
     // Allocazione delle colonne per ogni riga
-    for (int i = 0; i <= ROWS; i++)
+    for (int i = 0; i < ROWS; i++)
     {
         grid[i] = calloc(COLUMNS, sizeof(char));
     }
 
-    // Ogni cella della griglia è inizializzata con EMPTY_CELL
-    for (int i = 0; i < ROWS; i++)
+    // Ogni cella della griglia è inizializzata con EMPTY_CELL tranne l'ultima riga
+    for (int i = 0; i < ROWS - 1; i++)
     {
         for (int j = 0; j < COLUMNS; j++)
         {
@@ -56,7 +57,13 @@ extern void init()
         }
     }
 
-    // Posizione iniziale della nave
+    // L'ultima riga è inizializzata con VOID_CELL
+    for (int i = 0; i < COLUMNS; i++)
+    {
+        grid[ROWS - 1][i] = VOID_CELL;
+    }
+
+    // Posizione iniziale della nave sulla penuiltima riga
     grid[ROWS - 2][shipPosition] = SHIP_CELL;
 }
 /*
@@ -305,20 +312,19 @@ extern int redrawRowsTicker()
         return 1; // Game over
     }
     // Avanzamento della griglia di gioco
-    for (int i = nextRow; i > 0; i--)
+    // Dalla righa 19 alla riga 1
+    for (int i = ROWS - 3; i > 0; i--)
     {
-        for (int j = 1; j < COLUMNS; j++)
+        // Copia per ogni colonna la cella della riga precedente
+        for (int j = 0; j < COLUMNS; j++)
         {
-            // Copia della riga superiore in quella inferiore
             grid[i][j] = grid[i - 1][j];
-            // Pulizia della riga superiore
-            grid[i - 1][j] = EMPTY_CELL;
         }
     }
-    nextRow++; // Incremento della prossima riga
-    if (nextRow == ROWS - 1)
+    // La riga 0 diventa vuota
+    for (int i = 0; i < COLUMNS; i++)
     {
-        nextRow--;
+        grid[0][i] = EMPTY_CELL;
     }
     // Stampa della griglia di gioco
     printGrid();
