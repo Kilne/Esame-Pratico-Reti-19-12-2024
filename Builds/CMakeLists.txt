@@ -35,14 +35,16 @@ set(LIB_SOURCES
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customConnection.h
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customUDPTransmission.c
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customUDPTransmission.h
-    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customFifoTools.h
-    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customFifoTools.c
     ${CMAKE_SOURCE_DIR}/../lib/gamelogics/meteorites.c
     ${CMAKE_SOURCE_DIR}/../lib/gamelogics/meteorites.h
     ${CMAKE_SOURCE_DIR}/../lib/gamelogics/drawingField.h
     ${CMAKE_SOURCE_DIR}/../lib/gamelogics/drawingField.c
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customICMP.c
     ${CMAKE_SOURCE_DIR}/../lib/wrappers/customICMP.h
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customQueIPC.h
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customQueIPC.c
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customDNS.c
+    ${CMAKE_SOURCE_DIR}/../lib/wrappers/customDNS.h
     ${CMAKE_SOURCE_DIR}/../lib/argChecker.h
 )
 

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
+#include <time.h>
 #include "../wrappers/customErrorPrinting.h"
 
 #define ROWS 11    // 10 righe di gioco + 1 riga di avviso
@@ -17,22 +18,21 @@
 #define METEORITE_CELL 'o'
 #define SHIP_CELL '^'
 #define EXPLOSION_CELL 'X'
-#define DANGER_MESSAGE "ATTENZIONE: METEORITE IN ARRIVO!"
-#define DANGER_RANGE 5
+#define DANGER_MESSAGE "METEORITE IN ARRIVO!"
+#define DANGER_RANGE 3
 #define LEFT_ARROW "\x1b[D"
 #define RIGHT_ARROW "\x1b[C"
 
-// Griglia di gioco
+// Griglia di gioco 10*20
 char **grid;
 /*
     Posizione della navicella che si può muovere
     Solo in una riga, aggiornato a ogni iterazione
 */
 int shipPosition = 9; // Posizione iniziale e centrale
-// Perciolo collisione attivo
-int dangerActive = 0;
-// Prossimo avanzamento della griglia di gioco
-int nextRow = 1;
+// Archivio meteoriti 11*20
+char **meteoritesBuffer;
+int dangerMessageOn = 0;
 
 /*
     Inizializzazione della griglia di gioco
@@ -65,6 +65,24 @@ extern void init()
 
     // Posizione iniziale della nave sulla penuiltima riga
     grid[ROWS - 2][shipPosition] = SHIP_CELL;
+
+    // Inizializzazione dell'archivio meteoriti
+    // 10 righe di 20 colonne  + 1 colonna per controllo
+    meteoritesBuffer = calloc(10, sizeof(char *));
+    for (int i = 0; i < 10; i++)
+    {
+        meteoritesBuffer[i] = calloc(21, sizeof(char));
+    }
+    // Aggiunta marker di controllo e valori iniziali
+    for (int i = 0; i < 10; i++)
+    {
+        for (int j = 1; j < 21; j++)
+        {
+            meteoritesBuffer[i][j] = '0';
+        }
+        // Carattere di controllo E : EMPTY quindi disponibile
+        meteoritesBuffer[i][0] = 'E';
+    }
 }
 /*
     Funzione per muovere la nave di gioco
@@ -104,34 +122,46 @@ extern void shipMovement(int move)
 void checkDanger()
 {
     // Il controllo del pericolo è fatto ad oogni redrawRowsTicker()
-    // In corrispondenza della posizione della nave, se almeno 5 righe sopra
+    // In corrispondenza della posizione della nave, se almeno 4 righe sopra
     // c'è un meteorite, viene mostrato un avviso di pericolo
     // nella riga di avviso apposita.
-    int firstRowToCheck = ROWS - 3;                      // Riga 18 sopra la nave
-    int lastRowToCheck = firstRowToCheck - DANGER_RANGE; // Riga 13 sopra la nave
-    int danger = 0;
-    for (int i = firstRowToCheck; i < lastRowToCheck; i--)
+    int startRowCheck = ROWS - 3;                // Righa di partenza per il controllo
+    int finalRowCheck = ROWS - 3 - DANGER_RANGE; // Righa finale per il controllo
+    int iSdangerPassed = 0;                      // Flag per il pericolo
+
+    // Controllo per il pericolo
+    for (int i = startRowCheck; i >= finalRowCheck; i--)
     {
+        // Se in una delle colonne sopra la nave c'è un meteorite si attiva il pericolo
         if (grid[i][shipPosition] == METEORITE_CELL)
         {
-            danger = 1;
+            iSdangerPassed = 1;
             break;
         }
     }
-    dangerActive = danger;
-    // Se c'è pericolo, viene mostrato l'avviso
-    if (dangerActive == 1)
+    if (iSdangerPassed == 1)
     {
-        for (int i = 0; i < strlen(DANGER_MESSAGE); i++)
+        dangerMessageOn = 1;
+    }
+    else
+    {
+        dangerMessageOn = 0;
+    }
+
+    if (dangerMessageOn == 1)
+    {
+        // Se il pericolo è attivo, viene mostrato il messaggio di pericolo
+        for (int i = 0; i < COLUMNS; i++)
         {
             grid[ROWS - 1][i] = DANGER_MESSAGE[i];
         }
     }
     else
     {
-        for (int i = 1; i < COLUMNS; i++)
+        // Se il pericolo non è attivo, la riga di avviso è vuota
+        for (int i = 0; i < COLUMNS; i++)
         {
-            grid[ROWS - 1][i] = EMPTY_CELL;
+            grid[ROWS - 1][i] = VOID_CELL;
         }
     }
 }
@@ -234,8 +264,8 @@ extern int checkTheInput(char *input, int inputSize)
     }
     else if (strcmp(input, "q") == 0)
     {
-        setTerminalMode(0);
         gameOver();
+        setTerminalMode(0);
         printf("Uscita dal gioco a breve.\n");
         return 1; // Chiusura del gioco
     }
@@ -259,40 +289,27 @@ extern void printGrid()
         printf("\n");
     }
 }
-
-/*
-    Inserimento dei meteoriti nella griglia di gioco
-    @param meteoritesBuffer: buffer contenente le posizioni dei meteoriti
-*/
-extern void addMeteors(char *newRowBuffer)
-{
-    // I meteoriti sono rappresentati da 'o' nella griglia
-    // E sono inseriti sempre a partire dalla griglia 0
-    for (int i = 1; i < COLUMNS; i++)
-    {
-        if (newRowBuffer[i] == '1')
-        {
-            grid[0][i] = METEORITE_CELL;
-        }
-        else
-        {
-            grid[0][i] = EMPTY_CELL;
-        }
-    }
-}
 /*
     Funzione interna per controllare la collisione tra nave e meteorite
+    @return: 0 se non c'è collisione, 1 altrimenti.
 */
 int checkCollision()
 {
-    // Controllo collisione tra la riga della nave e la riga subito sopra
-    for (int i = 1; i < COLUMNS; i++)
+    /*
+        Controllo collisione tra la riga della nave e la riga subito sopra
+        Il controllo avviene prima del "redraw" della griglia, in quanto
+        si suppone che una volta la nave aveva un meteorite sopra di se e
+        non si è spostata fino all'ultimo aggiornamento della griglia essa
+        verrà distrutta.
+    */
+    for (int i = 0; i < COLUMNS; i++)
     {
         if (grid[ROWS - 2][i] == SHIP_CELL && grid[ROWS - 3][i] == METEORITE_CELL)
         {
             return 1; // Collisione
         }
     }
+
     return 0; // Nessuna collisione
 }
 /*
@@ -306,20 +323,41 @@ extern int redrawRowsTicker()
     // Controllo per la collisione tra nave e meteorite
     if (checkCollision() == 1)
     {
+        // Se c'è una collisione, si attiva il game over
+        for (int i = 0; i < COLUMNS; i++)
+        {
+            grid[ROWS - 2][i] = EXPLOSION_CELL;
+        }
+        // Testo di game over nella riga di avviso
+        char *gameOverBuff = "GAME OVER";
+        size_t len = strlen(gameOverBuff);
+        for (int i = 0; i < COLUMNS; i++)
+        {
+            grid[ROWS - 1][i] = VOID_CELL;
+        }
+        for (int i = 0; i < len; i++)
+        {
+            grid[ROWS - 1][i] = gameOverBuff[i];
+        }
+        // Stampa della griglia di gioco
+        printGrid();
+        sleep(3);   // Attesa per la visualizzazione griglia di gioco
+        gameOver(); // Funzione per il game over
         setTerminalMode(0);
-        gameOver();
         printf("Game over, uscita dal gioco a breve.\n");
+        sleep(3); // Attesa per la visualizzazione del game over
         return 1; // Game over
     }
     // Avanzamento della griglia di gioco
-    // Dalla righa 19 alla riga 1
-    for (int i = ROWS - 3; i > 0; i--)
+    // Dalla righa 8 alla riga 1
+    int nextRowArray = 8;
+    while (nextRowArray > 0)
     {
-        // Copia per ogni colonna la cella della riga precedente
-        for (int j = 0; j < COLUMNS; j++)
+        for (int i = 1; i < COLUMNS; i++)
         {
-            grid[i][j] = grid[i - 1][j];
+            grid[nextRowArray][i] = grid[nextRowArray - 1][i];
         }
+        nextRowArray--;
     }
     // La riga 0 diventa vuota
     for (int i = 0; i < COLUMNS; i++)
@@ -330,4 +368,71 @@ extern int redrawRowsTicker()
     printGrid();
 
     return 0; // Nessun game over
+}
+/*
+    Inserimento dei meteoriti nella griglia di gioco
+    @param meteoritesBuffer: buffer contenente le posizioni dei meteoriti
+*/
+extern void addMeteors(char *newRowBuffer)
+{
+    // Per dare la possibilità ai giocatori di evitare i meteoriti è necessario
+    // dare uno "spazio" di manovra, quindi prima di inserire i meteoriti nella griglia
+    // si genera un numero casuale tra 0 e 5 per decidere se inserire o meno i meteoriti
+    srand(time(NULL));
+    int insertMeteorites = rand() % 5 + 1;
+
+    // Aggiungo a prescidere i meteoriti nell'archivio se c'è spazio
+    for (int i = 0; i < 10; i++)
+    {
+        if (meteoritesBuffer[i][0] == 'E')
+        {
+            meteoritesBuffer[i][0] = 'F'; // Flag per la riga piena, FULL
+            for (int j = 1; j < 21; j++)
+            {
+                // J-1 perché il primo carattere è il flag per l'array di archivio ma non per il buffer in arrivo
+                // che è di 20 caratteri
+                meteoritesBuffer[i][j] = newRowBuffer[j - 1];
+            }
+            break;
+        }
+    }
+
+    // I meteoriti sono rappresentati da 'o' nella griglia
+    // E sono inseriti sempre a partire dalla griglia 0
+    // Se il numero casuale è minore di 3, non vengono inseriti meteoriti
+    // Se il numero casuale è maggiore  3, vengono inseriti i meteoriti
+    // Dall'archivio meteoriti
+    if (insertMeteorites > 3)
+    {
+        int found = 0;
+        while (found == 0)
+        {
+            // Scorro fino a trovare una F
+            for (int i = 0; i < 10; i++)
+            {
+                if (meteoritesBuffer[i][0] == 'F')
+                {
+                    // Inserisco i meteoriti nella griglia
+                    for (int j = 1; j < 21; j++)
+                    {
+                        // J-1 perché la griglia è di 20 colonne non 21
+                        if (meteoritesBuffer[i][j] == '1')
+                        {
+                            grid[0][j - 1] = METEORITE_CELL;
+                        }
+                        else
+                        {
+                            grid[0][j - 1] = EMPTY_CELL;
+                        }
+                        // Al contempo svuoto l'archivio meteoriti per la riga
+                        meteoritesBuffer[i][j] = '0';
+                    }
+                    // Flag per la riga vuota, EMPTY
+                    meteoritesBuffer[i][0] = 'E';
+                    found = 1; // Meteoriti inseriti, esci dal while e for
+                    break;
+                }
+            }
+        }
+    }
 }

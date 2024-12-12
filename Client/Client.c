@@ -10,7 +10,7 @@
 #include "../lib/wrappers/customErrorPrinting.h"
 #include "../lib/wrappers/customConnection.h"
 #include "../lib/wrappers/pollUtils.h"
-#include "../lib/wrappers/customFifoTools.h"
+#include "../lib/wrappers/customQueIPC.h"
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +19,10 @@
 #include <sys/socket.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
+
+#define GAME_QUEUE "/gameQueue"     // Coda per messaggi CLIENT -> GAME
+#define CLIENT_QUEUE "/clientQueue" // Coda per messaggi GAME -> CLIENT
 
 int main(int argc, char const *argv[])
 {
@@ -58,50 +62,23 @@ int main(int argc, char const *argv[])
     // Buffer per la ricezione dei messaggi dalla FIFO
     char *bufferReceived = calloc(20, sizeof(char));
 
-    // Special connect
+    // Registrzione del client con il server a livello Kernel
     customConnection_init(clientSocket, &serverAddr);
 
-    /*
-        TODO:
-            - Implementare l'apertura del terminale                                                                 [DONE]
-            - Avvviare il gioco                                                                                     [DONE]
-            - Ristrutturare il buffer delle meteore in maniera tale da avere max 20 buffer da mandare al gioco      [DONE]
-                - Oltre i venti buffer i messaggi vanno scartati                                                    [DONE]
-                - Ogni volta che mandi una FIFO al gioco libera il buffer per un messaggio                          [DONE?]
-            - Utilizzo della FIFO per la comunicazione con il gioco                                                 [DONE]
-            - Implementare la terminazione del gioco, con Epoll emettere un evento sulla FIFO e far chiudere il Client(previa disconnect)
-                attraverso un ultimo messaggio al client per togliere la propria entry dalla lista di quelli in ascolto. [FAILED]
-            - Indagare sulla possibile morte del server con errore ICMP e propagare l'errore al gioco ed il client,
-                probabilemnte un timeout -> retry -> ICMP x 3 -> terminazione
-            - Chiusura/Delete della FIFO al termine del gioco/client con atexit                                     [DONE]
-            - Risoluzione DNS del server con getaddrinfo
-            - Dato che dovrei terminare il client in maniera "Graziosa" interroppendo il cilo while, fare a fine
-                ciclo un repulisti di memoria:
-                - Libero i buffer delle meteore                         [DONE]
-                - Chiudo il socket                                      [DONE]
-                - Chiudo la FIFO                                        [DONE]
-                - Chiudo l'istanza di epoll                             [DONE]
-                - Libero la memoria allocata per la struttura del server[DONE]
-    */
-
-    // Apertura del terminal con spawn di un processo figlio dedito al gioco
-    int systemResult = 0;
-    // system("gnome-terminal -- bash -c 'cd Builds; ./Game; exec bash'");
-    systemResult = system("gnome-terminal -- ./Game");
-    if (systemResult == -1)
-    {
-        customErrorPrinting("[ERROR] Apertura del terminale fallita\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // Inizializzazione della pipeline per la comunicazione con il gioco
-    createFifo();
-    setFifoFd();
-    printf("[INFO] FIFO aperta dal client su file descriptor: %d\n", getFifoFd());
-    addFileDescriptorToThePolling(getFifoFd(), EPOLLIN | EPOLLOUT);
+    // Inizializzazione della message queue per la comunicazione con il gioco
+    mq_open_data queueData = createQueue(GAME_QUEUE);
+    mq_open_data queueData_2 = createQueue(CLIENT_QUEUE);
+    int queFd = queueData.fileDescriptor;            // File descriptor della coda client -> gioco
+    char *queueName = queueData.nameOfTheQueue;      // Nome della coda, da passare poi come argomento al gioco
+    int queFd_2 = queueData_2.fileDescriptor;        // File descriptor della coda gioco -> client
+    char *queueName_2 = queueData_2.nameOfTheQueue;  // Nome della coda, da passare poi come argomento al gioco
+    addFileDescriptorToThePolling(queFd, EPOLLOUT);  // Scrivo nella coda al gioco
+    addFileDescriptorToThePolling(queFd_2, EPOLLIN); // Leggo dalla coda al client
 
     // Segnale per la terminazione del gioco
     int gameTerminated = 0;
+    // Stringa di controllo chiusura del gioco
+    char *gameEndString = "GAME OVER";
 
     // Inzia il gioco
     int sendRes = customSend(clientSocket, &serverAddr, "START");
@@ -110,8 +87,24 @@ int main(int argc, char const *argv[])
         customErrorPrinting("[ERROR] Il server non è raggiungibile\n");
         exit(EXIT_FAILURE);
     }
-    // Stringa di controllo chiusura del gioco
-    char *gameEndString = "GAME OVER";
+
+    // Apertura del terminal con spawn di un processo figlio dedito al gioco
+    int systemResult = 0;
+    char *baseCommand = "gnome-terminal -- ./Game";
+    // system("gnome-terminal -- bash -c 'cd Builds; ./Game; exec bash'"); // SOLO PER DEBUG SU VS CODE
+    // Preparazione del comando per l'apertura del terminale con argomenti i nomi delle code
+    char *composedCommand = calloc(strlen(baseCommand) +
+                                       strlen(queueName) +
+                                       strlen(queueName_2) +
+                                       2 + 1,
+                                   sizeof(char)); // 2 spazi e terminatore
+    sprintf(composedCommand, "%s %s %s", baseCommand, queueName, queueName_2);
+    systemResult = system(composedCommand);
+    if (systemResult == -1)
+    {
+        customErrorPrinting("[ERROR] Apertura del terminale fallita\n");
+        exit(EXIT_FAILURE);
+    }
 
     // Ciclo di gioco
     while (gameTerminated == 0)
@@ -141,35 +134,81 @@ int main(int argc, char const *argv[])
                     printf("[INFO] Ricevuto buffer dal server: %s\n", messageBuffer[meteorStored]);
                 }
             }
-            // Controllo se la FIFO è pronta
-            else if (fdEvents[i].data.fd == getFifoFd())
+            // Controllo se la coda è pronta per operazioni di I/O
+            else if (fdEvents[i].data.fd == queFd)
             {
+                // EVENTO DI SCRITTURA
                 if (fdEvents[i].events & EPOLLOUT)
                 {
                     // Invio del buffer alla FIFO
-                    int sentBytesToFifo = 0;
-                    if (meteorStored != -1)
+                    int messageSent = 0;
+                    if (meteorStored != -1) // Controllo se ci sono buffer da inviare
                     {
-                        // RAGIONEVOLMENTE non dovrei passare array nulli alla FIFO con il contatore
-                        sentBytesToFifo = customFifoWrite(messageBuffer[meteorStored]);
-                        printf("[INFO] Inviati %d byte alla FIFO: %s\n", sentBytesToFifo, messageBuffer[meteorStored]);
+                        // RAGIONEVOLMENTE non dovrei passare array nulli alla coda con il contatore
+                        messageSent = sendMessageToQueue(queFd, messageBuffer[meteorStored]);
+                        if (messageSent == 0)
+                        {
+                            printf("[INFO] Inviati dati alla coda: %s\n", messageBuffer[meteorStored]);
+                        }
+                        else if (messageSent == 1)
+                        {
+                            // Ritento per 5 volte l'invio del messaggio
+                            int retryCounter = 0;
+                            while (retryCounter < 5)
+                            {
+                                messageSent = sendMessageToQueue(queFd, messageBuffer[meteorStored]);
+                                if (messageSent == 0)
+                                {
+                                    printf("[INFO] Inviati dati alla coda: %s\n", messageBuffer[meteorStored]);
+                                    break;
+                                }
+                                else if (messageSent == -1)
+                                {
+                                    customErrorPrinting("[ERROR] Errore nell'invio del messaggio alla coda\n");
+                                    break;
+                                }
+                                retryCounter++;
+                            }
+                            // Teoricamente la coda non dovrebbe riempiersi mai
+                            customErrorPrinting("[ERROR] Coda piena, impossibile inviare il messaggio\n");
+                        }
+                        else
+                        {
+                            customErrorPrinting("[ERROR] Errore nell'invio del messaggio alla coda\n");
+                        }
                         // Libero il buffer per il prossimo messaggio
                         freeUDPMessage(messageBuffer[meteorStored]);
                         // Decremento il contatore delle meteore
                         meteorStored--;
                     }
                 }
-                else if (fdEvents[i].events & EPOLLIN)
+            }
+            else if (fdEvents[i].data.fd == queFd_2)
+            {
+                // EVENTO DI LETTURA
+                if (fdEvents[i].events & EPOLLIN)
                 {
-                    // Lettura dalla FIFO
-                    int bytesReceived = customFifoRead(bufferReceived);
-                    printf("[INFO] Letti %d byte dalla FIFO: %s\n", bytesReceived, bufferReceived);
-                    if (strcmp(gameEndString, bufferReceived) == 0)
+                    // Ricezione del messaggio dalla coda
+                    char *messageReceived = receiveMessageFromQueue(queFd_2);
+                    if (messageReceived != NULL)
                     {
-                        // Game over procedi alla terminazione del gioco
-                        printf("[INFO] Terminazione del gico in corso\n");
-                        gameTerminated = 1;
+                        // Controllo se il messaggio ricevuto è di chiusura del gioco
+                        if (strcmp(messageReceived, gameEndString) == 0)
+                        {
+                            // Il gioco è stato chiuso
+                            gameTerminated = 1;
+                            break; // Uscita dal ciclo for
+                        }
                     }
+                    else if (strcmp(messageReceived, "EMPTY") == 0)
+                    {
+                        customErrorPrinting("[INFO] Coda vuota\n");
+                    }
+                    else
+                    {
+                        customErrorPrinting("[ERROR] Errore nella ricezione del messaggio dalla coda\n");
+                    }
+                    free(messageReceived);
                 }
             }
         }
@@ -182,11 +221,17 @@ int main(int argc, char const *argv[])
 
         // Chiusura dell'istanza di epoll
         removeFileDescriptorFromThePolling(clientSocket);
-        removeFileDescriptorFromThePolling(getFifoFd());
+        removeFileDescriptorFromThePolling(queFd);
         closeEpoll();
 
-        // Chiusura della FIFO
-        deleteFifo();
+        // Chiusura della message queue
+        closeTheQueue(queFd);
+        closeTheQueue(queFd_2);
+        destroyQueue(queueData.nameOfTheQueue);
+        destroyQueue(queueData_2.nameOfTheQueue);
+
+        // Deregistrazione del client dal server
+        customDisconnect(clientSocket);
 
         // Chiusura del socket
         if (close(clientSocket) == -1)
@@ -195,9 +240,12 @@ int main(int argc, char const *argv[])
             exit(EXIT_FAILURE);
         }
 
-        // Liberazione della memoria allocata per la struttura del server
+        // Liberazione della
         free(messageBuffer);
         free(bufferReceived);
+
+        // Uscita dal client
+        exit(EXIT_SUCCESS);
     }
 
     return 0;
