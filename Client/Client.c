@@ -91,7 +91,6 @@ int main(int argc, char const *argv[])
     // Apertura del terminal con spawn di un processo figlio dedito al gioco
     int systemResult = 0;
     char *baseCommand = "gnome-terminal -- ./Game";
-    // system("gnome-terminal -- bash -c 'cd Builds; ./Game; exec bash'"); // SOLO PER DEBUG SU VS CODE
     // Preparazione del comando per l'apertura del terminale con argomenti i nomi delle code
     char *composedCommand = calloc(strlen(baseCommand) +
                                        strlen(queueName) +
@@ -105,14 +104,39 @@ int main(int argc, char const *argv[])
         customErrorPrinting("[ERROR] Apertura del terminale fallita\n");
         exit(EXIT_FAILURE);
     }
+    // Valore temporale per generare un ping al server ogni 30 secondi
+    double generatePingAfter = 30;
+    time_t currentTimeElapsed;
+    time_t timeFromLastPing;
+    time(&timeFromLastPing);
 
     // Ciclo di gioco
     while (gameTerminated == 0)
     {
+        // Ping al server per controllare la connessione ogni 30 secondi
+        time(&currentTimeElapsed);
+        if (difftime(currentTimeElapsed, timeFromLastPing) >= generatePingAfter)
+        {
+            int pingRes = customSend(clientSocket, &serverAddr, "PING");
+            if (pingRes == 1)
+            {
+                customErrorPrinting("[ERROR] Il server non è raggiungibile\n");
+                // Chiusura del gioco
+                gameTerminated = 1;
+                int s = sendMessageToQueue(queFd, "DEAD");
+                printf("[INFO] Chiusura del gioco\n");
+                continue;
+            }
+            time(&timeFromLastPing);
+        }
+        else
+        {
+            currentTimeElapsed = 0;
+        }
+
         // Attesa degli eventi di I/O
         struct epoll_event fdEvents[10];
         int triggeredEvents = waitForEvents(fdEvents, 10);
-
         // Logica evento per evento
         for (int i = 0; i < triggeredEvents; i++)
         {
@@ -216,8 +240,6 @@ int main(int argc, char const *argv[])
 
     if (gameTerminated == 1)
     {
-        // Disconnessione dal server
-        customDisconnect(clientSocket);
 
         // Chiusura dell'istanza di epoll
         removeFileDescriptorFromThePolling(clientSocket);

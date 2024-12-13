@@ -36,7 +36,7 @@ extern int customSend(int socket, struct sockaddr_in *server, char *buffer)
     }
     else
     {
-        // Controllo degli errori ICMP asincroni che non sono visti da send a differenza di recv
+        // Controllo degli errori ICMP asincroni che non sono visti da send
         if (detectICMP(socket, server) == 1)
         {
             return 1;

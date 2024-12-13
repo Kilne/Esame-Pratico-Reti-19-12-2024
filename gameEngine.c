@@ -66,7 +66,7 @@ int main(int argc, char const *argv[])
             // Controllo evento
             for (int i = 0; i < triggeredEvents; i++)
             {
-                // Controllo se l'evento è relativo alla FIFO del client
+                // Controllo se l'evento è relativo alla coda del client
                 if (events[i].data.fd == queFd)
                 {
                     if (events[i].events & EPOLLHUP)
@@ -82,12 +82,11 @@ int main(int argc, char const *argv[])
                     {
                         // Lettura dalla coda messaggi
                         fromClientBuffer = receiveMessageFromQueue(queFd);
-                        if (fromClientBuffer == NULL)
+                        if (fromClientBuffer == NULL || strcmp(fromClientBuffer, "DEAD") == 0)
                         {
                             setTerminalMode(0);     // Rimetto il terminale in modalità normale
                             printf("\033[H\033[J"); // Pulizia del terminale
-                            // Morsto l'errore e termino il gioco
-                            customErrorPrinting("[ERROR] Errore nella lettura dalla coda del client\n");
+                            printf("[ERROR] Server assente o problema con la coda messaggi.\n");
                             gameOver = 1;
                             quittingGame = 1;
                             break; // Esco dal ciclo for e torno al while
